@@ -1,0 +1,225 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Modelos principales ──────────────────────────────────
+
+model Alojamiento {
+  Id          Int     @id(map: "PK_Alojamientos") @default(autoincrement())
+  Nombre      String
+  Tipo        Int     // 0=Cabana 1=Habitacion 2=Apart
+  Capacidad   Int
+  Descripcion String?
+  Activo      Boolean
+
+  ApartDetalles_ApartDetalles_AlojamientoApartIdToAlojamientos ApartDetalle[] @relation("ApartDetalles_AlojamientoApartIdToAlojamientos")
+  ApartDetalles_ApartDetalles_AlojamientoHab1IdToAlojamientos  ApartDetalle[] @relation("ApartDetalles_AlojamientoHab1IdToAlojamientos")
+  ApartDetalles_ApartDetalles_AlojamientoHab2IdToAlojamientos  ApartDetalle[] @relation("ApartDetalles_AlojamientoHab2IdToAlojamientos")
+  Reservas    Reserva[]
+  Tarifas     Tarifa[]
+
+  @@map("Alojamientos")
+}
+
+model ApartDetalle {
+  Id                 Int         @id(map: "PK_ApartDetalles") @default(autoincrement())
+  AlojamientoApartId Int
+  AlojamientoHab1Id  Int
+  AlojamientoHab2Id  Int
+
+  Alojamientos_ApartDetalles_AlojamientoApartIdToAlojamientos Alojamiento @relation("ApartDetalles_AlojamientoApartIdToAlojamientos", fields: [AlojamientoApartId], references: [Id], onUpdate: NoAction, map: "FK_ApartDetalles_Alojamientos_AlojamientoApartId")
+  Alojamientos_ApartDetalles_AlojamientoHab1IdToAlojamientos  Alojamiento @relation("ApartDetalles_AlojamientoHab1IdToAlojamientos", fields: [AlojamientoHab1Id], references: [Id], onUpdate: NoAction, map: "FK_ApartDetalles_Alojamientos_AlojamientoHab1Id")
+  Alojamientos_ApartDetalles_AlojamientoHab2IdToAlojamientos  Alojamiento @relation("ApartDetalles_AlojamientoHab2IdToAlojamientos", fields: [AlojamientoHab2Id], references: [Id], onUpdate: NoAction, map: "FK_ApartDetalles_Alojamientos_AlojamientoHab2Id")
+
+  @@index([AlojamientoApartId], map: "IX_ApartDetalles_AlojamientoApartId")
+  @@index([AlojamientoHab1Id], map: "IX_ApartDetalles_AlojamientoHab1Id")
+  @@index([AlojamientoHab2Id], map: "IX_ApartDetalles_AlojamientoHab2Id")
+  @@map("ApartDetalles")
+}
+
+model Temporada {
+  Id          Int      @id(map: "PK_Temporadas") @default(autoincrement())
+  Nombre      String
+  FechaInicio DateTime @db.Timestamptz(6)
+  FechaFin    DateTime @db.Timestamptz(6)
+  Activo      Boolean
+
+  Tarifas Tarifa[]
+
+  @@map("Temporadas")
+}
+
+model Tarifa {
+  Id                Int         @id(map: "PK_Tarifas") @default(autoincrement())
+  AlojamientoId     Int
+  TemporadaId       Int
+  CantidadPersonas  Int
+  PrecioConDesayuno Decimal     @db.Decimal(18, 2)
+  PrecioSinDesayuno Decimal     @db.Decimal(18, 2)
+  Activo            Boolean
+
+  Alojamientos Alojamiento @relation(fields: [AlojamientoId], references: [Id], onDelete: Cascade, onUpdate: NoAction, map: "FK_Tarifas_Alojamientos_AlojamientoId")
+  Temporadas   Temporada   @relation(fields: [TemporadaId], references: [Id], onDelete: Cascade, onUpdate: NoAction, map: "FK_Tarifas_Temporadas_TemporadaId")
+
+  @@unique([AlojamientoId, CantidadPersonas, TemporadaId], map: "IX_Tarifas_AlojamientoId_CantidadPersonas_TemporadaId")
+  @@index([TemporadaId], map: "IX_Tarifas_TemporadaId")
+  @@map("Tarifas")
+}
+
+model Reserva {
+  Id                Int      @id(map: "PK_Reservas") @default(autoincrement())
+  AlojamientoId     Int
+  NombreHuesped     String
+  Telefono          String?
+  FechaIngreso      DateTime @db.Timestamptz(6)
+  FechaSalida       DateTime @db.Timestamptz(6)
+  MontoTotal        Decimal  @db.Decimal(18, 2)
+  MontoSena         Decimal  @db.Decimal(18, 2)
+  Estado            Int      // 0=Confirmada 1=Cancelada 2=Finalizada
+  EsInvitacion      Boolean
+  IncluyeDesayuno   Boolean
+  CantidadHuespedes Int
+  CanalOrigen       String?
+  Observaciones     String?
+  FechaCarga        DateTime @db.Timestamptz(6)
+
+  Pagos        Pago[]
+  Alojamientos Alojamiento @relation(fields: [AlojamientoId], references: [Id], onDelete: Cascade, onUpdate: NoAction, map: "FK_Reservas_Alojamientos_AlojamientoId")
+
+  @@index([AlojamientoId], map: "IX_Reservas_AlojamientoId")
+  @@map("Reservas")
+}
+
+model Pago {
+  Id            Int      @id(map: "PK_Pagos") @default(autoincrement())
+  ReservaId     Int
+  TipoPago      Int      // 0=Sena 1=Cancelacion 2=AjusteCorreccion
+  Monto         Decimal  @db.Decimal(18, 2)
+  MetodoPago    Int      // 0=Transferencia 1=Efectivo 2=TarjetaCredito 3=TarjetaDebito
+  Fecha         DateTime @db.Timestamptz(6)
+  Observaciones String?
+
+  Reservas Reserva @relation(fields: [ReservaId], references: [Id], onDelete: Cascade, onUpdate: NoAction, map: "FK_Pagos_Reservas_ReservaId")
+
+  @@index([ReservaId], map: "IX_Pagos_ReservaId")
+  @@map("Pagos")
+}
+
+// ─── Modelo nuevo (creado por Prisma) ────────────────────
+
+model Usuario {
+  id            Int      @id @default(autoincrement())
+  userName      String   @unique
+  passwordHash  String
+  rol           Int      @default(1) // 0=Administrador 1=Viewer
+  activo        Boolean  @default(true)
+  fechaCreacion DateTime @default(now())
+}
+
+// ─── Tablas de ASP.NET Identity (solo referencia, no usar desde Next.js) ─────
+
+model AspNetRoleClaims {
+  Id          Int         @id(map: "PK_AspNetRoleClaims") @default(autoincrement())
+  RoleId      String
+  ClaimType   String?
+  ClaimValue  String?
+  AspNetRoles AspNetRoles @relation(fields: [RoleId], references: [Id], onDelete: Cascade, onUpdate: NoAction, map: "FK_AspNetRoleClaims_AspNetRoles_RoleId")
+
+  @@index([RoleId], map: "IX_AspNetRoleClaims_RoleId")
+  @@ignore
+}
+
+model AspNetRoles {
+  Id               String             @id(map: "PK_AspNetRoles")
+  Name             String?            @db.VarChar(256)
+  NormalizedName   String?            @unique(map: "RoleNameIndex") @db.VarChar(256)
+  ConcurrencyStamp String?
+  AspNetRoleClaims AspNetRoleClaims[]
+  AspNetUserRoles  AspNetUserRoles[]
+
+  @@ignore
+}
+
+model AspNetUserClaims {
+  Id          Int         @id(map: "PK_AspNetUserClaims") @default(autoincrement())
+  UserId      String
+  ClaimType   String?
+  ClaimValue  String?
+  AspNetUsers AspNetUsers @relation(fields: [UserId], references: [Id], onDelete: Cascade, onUpdate: NoAction, map: "FK_AspNetUserClaims_AspNetUsers_UserId")
+
+  @@index([UserId], map: "IX_AspNetUserClaims_UserId")
+  @@ignore
+}
+
+model AspNetUserLogins {
+  LoginProvider       String
+  ProviderKey         String
+  ProviderDisplayName String?
+  UserId              String
+  AspNetUsers         AspNetUsers @relation(fields: [UserId], references: [Id], onDelete: Cascade, onUpdate: NoAction, map: "FK_AspNetUserLogins_AspNetUsers_UserId")
+
+  @@id([LoginProvider, ProviderKey], map: "PK_AspNetUserLogins")
+  @@index([UserId], map: "IX_AspNetUserLogins_UserId")
+  @@ignore
+}
+
+model AspNetUserRoles {
+  UserId      String
+  RoleId      String
+  AspNetRoles AspNetRoles @relation(fields: [RoleId], references: [Id], onDelete: Cascade, onUpdate: NoAction, map: "FK_AspNetUserRoles_AspNetRoles_RoleId")
+  AspNetUsers AspNetUsers @relation(fields: [UserId], references: [Id], onDelete: Cascade, onUpdate: NoAction, map: "FK_AspNetUserRoles_AspNetUsers_UserId")
+
+  @@id([UserId, RoleId], map: "PK_AspNetUserRoles")
+  @@index([RoleId], map: "IX_AspNetUserRoles_RoleId")
+  @@ignore
+}
+
+model AspNetUserTokens {
+  UserId        String
+  LoginProvider String
+  Name          String
+  Value         String?
+  AspNetUsers   AspNetUsers @relation(fields: [UserId], references: [Id], onDelete: Cascade, onUpdate: NoAction, map: "FK_AspNetUserTokens_AspNetUsers_UserId")
+
+  @@id([UserId, LoginProvider, Name], map: "PK_AspNetUserTokens")
+  @@ignore
+}
+
+model AspNetUsers {
+  Id                   String             @id(map: "PK_AspNetUsers")
+  FechaCreacion        DateTime           @db.Timestamptz(6)
+  UserName             String?            @db.VarChar(256)
+  NormalizedUserName   String?            @unique(map: "UserNameIndex") @db.VarChar(256)
+  Email                String?            @db.VarChar(256)
+  NormalizedEmail      String?            @db.VarChar(256)
+  EmailConfirmed       Boolean
+  PasswordHash         String?
+  SecurityStamp        String?
+  ConcurrencyStamp     String?
+  PhoneNumber          String?
+  PhoneNumberConfirmed Boolean
+  TwoFactorEnabled     Boolean
+  LockoutEnd           DateTime?          @db.Timestamptz(6)
+  LockoutEnabled       Boolean
+  AccessFailedCount    Int
+  AspNetUserClaims     AspNetUserClaims[]
+  AspNetUserLogins     AspNetUserLogins[]
+  AspNetUserRoles      AspNetUserRoles[]
+  AspNetUserTokens     AspNetUserTokens[]
+
+  @@index([NormalizedEmail], map: "EmailIndex")
+  @@ignore
+}
+
+model EFMigrationsHistory {
+  MigrationId    String @id(map: "PK___EFMigrationsHistory") @db.VarChar(150)
+  ProductVersion String @db.VarChar(32)
+
+  @@map("__EFMigrationsHistory")
+  @@ignore
+}
