@@ -1,0 +1,468 @@
+@model InicioViewModel
+@{
+    ViewData["Title"] = "Inicio";
+
+    string FmtFecha(DateOnly d) => d.ToString("dd/MM/yyyy");
+
+    string AbrevAloj(string n) =>
+        n.StartsWith("Habitación ") ? "Hab. " + n.Substring("Habitación ".Length) :
+        n.StartsWith("Apart ")      ? "Ap. "  + n.Substring("Apart ".Length) :
+        n.StartsWith("Cabaña ")     ? "Cab. " + n.Substring("Cabaña ".Length) :
+        n;
+}
+
+<style>
+    @@media (max-width: 767.98px) {
+        /* Botones "Ver": ancho fijo uniforme, alineados al eje vertical derecho */
+        .btn-sm.py-0 {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            min-width: 52px !important;
+            width: 52px !important;
+            padding-left: .5rem !important;
+            padding-right: .5rem !important;
+            margin-left: auto !important;
+            font-weight: bold !important;
+        }
+        /* Pendientes: monto en rojo en negrita */
+        td.text-end.fw-semibold.text-danger { font-weight: bold !important; }
+        /* Pendientes: botón "Ver" en negrita */
+        .btn-outline-danger.btn-sm.py-0 { font-weight: bold !important; }
+        /* Badges numéricos de encabezados: centrado vertical */
+        .badge { display: inline-flex !important; align-items: center !important; vertical-align: middle !important; }
+        /* Todas las secciones con botón "Ver": padding-right igualado al de Pendientes (.25rem) */
+        .lista-ver-items .list-group-item { padding-right: .25rem !important; }
+        /* Pendientes: padding-left del titular igualado al de las demás secciones (1rem) */
+        .tabla-pendientes tbody td:first-child,
+        .tabla-pendientes thead th:first-child { padding-left: 1rem !important; }
+        /* Badges de alojamiento por sección */
+        .aloj-badge-checkin,
+        .aloj-badge-checkout-hoy,
+        .aloj-badge-manana,
+        .aloj-badge-pendiente {
+            border-radius: .375rem !important;
+            padding: 2px 6px !important;
+            font-size: .75em !important;
+            font-weight: 700 !important;
+            display: inline-block !important;
+        }
+        .aloj-badge-checkin      { background-color: #198754 !important; color: #fff !important; }
+        .aloj-badge-checkout-hoy { background-color: #ffc107 !important; color: #212529 !important; }
+        .aloj-badge-manana       { background-color: #ffc107 !important; color: #212529 !important; }
+        .aloj-badge-pendiente    { background-color: #dc3545 !important; color: #fff !important; }
+        /* Tabla de limpieza: Unidad estrecha + nowrap, Tareas flexible + word-wrap */
+        #tabla-limpieza { table-layout: fixed !important; width: 100% !important; }
+        #tabla-limpieza th:first-child,
+        #tabla-limpieza td:first-child { width: 90px !important; white-space: nowrap !important; }
+        #tabla-limpieza td:last-child,
+        #tabla-limpieza th:last-child { word-wrap: break-word !important; overflow-wrap: break-word !important; }
+        #tabla-limpieza .badge { white-space: normal !important; }
+    }
+    @@media (min-width: 769px) {
+        /* Badges de alojamiento en desktop */
+        .aloj-badge-checkin,
+        .aloj-badge-checkout-hoy,
+        .aloj-badge-manana {
+            border-radius: .375rem;
+            padding: 2px 8px;
+            font-size: .8em;
+            font-weight: 600;
+            display: inline-block;
+        }
+        .aloj-badge-checkin                    { background-color: #198754; color: #fff; }
+        .aloj-badge-checkout-hoy,
+        .aloj-badge-manana                     { background-color: #ffc107; color: #212529; }
+        /* Saldo pendiente: negrita */
+        td.text-end.fw-semibold.text-danger    { font-weight: bold !important; }
+        /* Botones "Ver": negrita */
+        .btn-sm.py-0                           { font-weight: bold !important; }
+        /* Pendientes: padding-right de la celda Ver igualado a list-group-item (1rem) */
+        .tabla-pendientes tbody td:first-child,
+        .tabla-pendientes thead th:first-child { padding-left: 1rem !important; }
+        .tabla-pendientes tbody td:last-child  { padding-right: 1rem !important; }
+    }
+</style>
+
+@* ── Encabezado ── *@
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0">Panel de inicio</h2>
+</div>
+
+@* ══════════════════════════════════════════════════════════════
+   SECCIÓN HOY
+   ══════════════════════════════════════════════════════════════ *@
+<h5 class="text-uppercase text-muted fw-semibold mb-3" style="letter-spacing:.06em; font-size:1.1rem;">
+    <i class="bi bi-calendar3 me-1" style="color:#212529;"></i><strong>Hoy</strong> — @FmtFecha(Model.Hoy)
+</h5>
+
+@* ── Fila 1: Check-ins / Check-outs hoy ── *@
+<div class="row g-3 mb-3">
+    @* Check-ins hoy *@
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header fw-semibold bg-success bg-opacity-10 text-success-emphasis">
+                <i class="bi bi-box-arrow-in-right me-1"></i>Check-ins de <strong>HOY</strong>
+                <span class="badge bg-success ms-2">@Model.CheckInsHoy.Count</span>
+            </div>
+            <div class="card-body p-0">
+                @if (!Model.CheckInsHoy.Any())
+                {
+                    <p class="text-muted fst-italic p-3 mb-0">Sin check-ins para hoy.</p>
+                }
+                else
+                {
+                    <ul class="list-group list-group-flush lista-ver-items">
+                        @foreach (var item in Model.CheckInsHoy)
+                        {
+                            <li class="list-group-item d-flex justify-content-between align-items-center py-2">
+                                <span>
+                                    <span class="fw-semibold">@item.NombreHuesped</span>
+                                    <span class="ms-1 aloj-badge-checkin">@item.NombreAlojamiento</span>
+                                </span>
+                                <a asp-controller="Reservas" asp-action="Details" asp-route-id="@item.ReservaId"
+                                   class="btn btn-outline-secondary btn-sm py-0">Ver</a>
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+        </div>
+    </div>
+
+    @* Check-outs hoy *@
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header fw-semibold bg-warning bg-opacity-10 text-warning-emphasis">
+                <i class="bi bi-box-arrow-right me-1"></i>Check-outs de <strong>HOY</strong>
+                <span class="badge bg-warning text-dark ms-2">@Model.CheckOutsHoy.Count</span>
+            </div>
+            <div class="card-body p-0">
+                @if (!Model.CheckOutsHoy.Any())
+                {
+                    <p class="text-muted fst-italic p-3 mb-0">Sin check-outs para hoy.</p>
+                }
+                else
+                {
+                    <ul class="list-group list-group-flush lista-ver-items">
+                        @foreach (var item in Model.CheckOutsHoy)
+                        {
+                            <li class="list-group-item d-flex justify-content-between align-items-center py-2">
+                                <span>
+                                    <span class="fw-semibold">@item.NombreHuesped</span>
+                                    <span class="ms-1 aloj-badge-checkout-hoy">@item.NombreAlojamiento</span>
+                                </span>
+                                <a asp-controller="Reservas" asp-action="Details" asp-route-id="@item.ReservaId"
+                                   class="btn btn-outline-secondary btn-sm py-0">Ver</a>
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@* ── Zona media: izquierda apilada (stats + limpieza) / derecha unidades libres ── *@
+@{
+    var habitacionesLibres = Model.UnidadesLibresHoy.Where(n => n.StartsWith("Habitación")).ToList();
+    var cabañasLibres      = Model.UnidadesLibresHoy.Where(n => n.StartsWith("Cabaña")).ToList();
+}
+<div class="row g-3 mb-3" style="align-items:stretch;">
+
+    @* ── Columna izquierda: stats + limpieza ── *@
+    <div class="col-md-6 d-flex flex-column gap-3">
+
+        @* Stats — tres tarjetas: col-12 en mobile, col-sm-4 en desktop *@
+        <div class="row g-3">
+            <div class="col-12 col-sm-4 d-flex">
+                <div class="card text-center flex-grow-1">
+                    <div class="card-body py-3 d-flex flex-column justify-content-center">
+                        <div class="display-6 fw-bold text-primary">@Model.PlazasOcupadasHoy</div>
+                        <div class="text-muted small mt-1">
+                            <span class="d-none d-md-block">Plazas ocupadas<br><strong>HOY</strong><br><span class="fst-italic">(Sin invitaciones)</span></span>
+                            <span class="d-md-none">Plazas ocupadas <strong>HOY</strong><br><span class="fst-italic">(sin invitaciones)</span></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-sm-4 d-flex">
+                <div class="card text-center flex-grow-1">
+                    <div class="card-body py-3 d-flex flex-column justify-content-center">
+                        <div class="display-6 fw-bold text-success">@Model.ComensalesDesayunoHoy</div>
+                        <div class="text-muted small mt-1">
+                            Huéspedes para desayuno <strong>HOY</strong><br>
+                            <span class="fst-italic">(@FmtFecha(Model.Hoy))</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-sm-4 d-flex">
+                <div class="card text-center flex-grow-1">
+                    <div class="card-body py-3 d-flex flex-column justify-content-center">
+                        <div class="display-6 fw-bold text-info">@Model.ComensalesDesayunoManana</div>
+                        <div class="text-muted small mt-1">
+                            Huéspedes para desayuno <strong>MAÑANA</strong><br>
+                            <span class="fst-italic">(@FmtFecha(Model.Manana))</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @* Limpieza (ocupa el espacio restante de la columna) *@
+        <div class="card flex-grow-1">
+            <div class="card-header fw-semibold bg-light">
+                <i class="bi bi-stars me-1"></i>Limpieza del día — @FmtFecha(Model.Hoy) <span class="text-muted fw-normal">(hoy)</span>
+            </div>
+            <div class="card-body p-0">
+                @if (!Model.LimpiezaDelDia.Any())
+                {
+                    <p class="text-muted fst-italic p-3 mb-0">Sin tareas de limpieza para hoy.</p>
+                }
+                else
+                {
+                    <table id="tabla-limpieza" class="table table-sm table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width:120px">Unidad</th>
+                                <th>Tareas</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in Model.LimpiezaDelDia)
+                            {
+                                <tr>
+                                    <td class="fw-semibold">@item.NombreAlojamiento</td>
+                                    <td>
+                                        @foreach (var tarea in item.Tareas)
+                                        {
+                                            <span class="badge bg-primary me-1 mb-1 fw-bold" style="font-size:.78rem;">@tarea</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </div>
+        </div>
+
+    </div>
+
+    @* ── Columna derecha: Estado de unidades (libres + ocupadas) ── *@
+    @{
+        var habOcupadas  = Model.UnidadesOcupadasHoy.Where(n => n.StartsWith("Habitación")).ToList();
+        var cabOcupadas  = Model.UnidadesOcupadasHoy.Where(n => n.StartsWith("Cabaña")).ToList();
+    }
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header fw-semibold bg-light">
+                <i class="bi bi-building me-1"></i>Estado de unidades hoy
+            </div>
+            <div class="card-body p-0">
+                <div class="row g-0 h-100">
+
+                    @* Libres *@
+                    <div class="col-6 border-end p-3">
+                        <div class="fw-semibold text-success small text-uppercase mb-2" style="letter-spacing:.04em;">
+                            <i class="bi bi-check-circle-fill me-1"></i>Libres
+                            <span class="badge bg-success ms-1">@Model.UnidadesLibresHoy.Count</span>
+                        </div>
+                        @if (!Model.UnidadesLibresHoy.Any())
+                        {
+                            <span class="text-muted fst-italic small">Ninguna libre.</span>
+                        }
+                        else
+                        {
+                            <ul class="list-unstyled mb-0">
+                                @foreach (var nombre in habitacionesLibres)
+                                {
+                                    <li class="py-1 small">
+                                        <i class="bi bi-check-circle text-success me-1"></i>@nombre
+                                    </li>
+                                }
+                                @if (habitacionesLibres.Any() && cabañasLibres.Any())
+                                {
+                                    <li class="py-1"><hr class="my-0" /></li>
+                                }
+                                @foreach (var nombre in cabañasLibres)
+                                {
+                                    <li class="py-1 small">
+                                        <i class="bi bi-check-circle text-success me-1"></i>@nombre
+                                    </li>
+                                }
+                            </ul>
+                        }
+                    </div>
+
+                    @* Ocupadas *@
+                    <div class="col-6 p-3">
+                        <div class="fw-semibold text-danger small text-uppercase mb-2" style="letter-spacing:.04em;">
+                            <i class="bi bi-x-circle-fill me-1"></i>Ocupadas
+                            <span class="badge bg-danger ms-1">@Model.UnidadesOcupadasHoy.Count</span>
+                        </div>
+                        @if (!Model.UnidadesOcupadasHoy.Any())
+                        {
+                            <span class="text-muted fst-italic small">Ninguna ocupada.</span>
+                        }
+                        else
+                        {
+                            <ul class="list-unstyled mb-0">
+                                @foreach (var nombre in habOcupadas)
+                                {
+                                    <li class="py-1 small">
+                                        <i class="bi bi-x-circle text-danger me-1"></i>@nombre
+                                    </li>
+                                }
+                                @if (habOcupadas.Any() && cabOcupadas.Any())
+                                {
+                                    <li class="py-1"><hr class="my-0" /></li>
+                                }
+                                @foreach (var nombre in cabOcupadas)
+                                {
+                                    <li class="py-1 small">
+                                        <i class="bi bi-x-circle text-danger me-1"></i>@nombre
+                                    </li>
+                                }
+                            </ul>
+                        }
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+@* ── Pendientes a cobrar en 24 hs ── *@
+<div class="card mb-4">
+    <div class="card-header fw-semibold bg-danger bg-opacity-10 text-danger-emphasis">
+        <i class="bi bi-cash-coin me-1"></i>Pendientes a cobrar en 24 hs
+        @if (Model.PendientesCobro.Any())
+        {
+            <span class="badge bg-danger ms-2">@Model.PendientesCobro.Count</span>
+        }
+    </div>
+    <div class="card-body p-0">
+        @if (!Model.PendientesCobro.Any())
+        {
+            <p class="text-muted fst-italic p-3 mb-0">Sin saldos pendientes para hoy ni mañana.</p>
+        }
+        else
+        {
+            <table class="table table-sm table-hover align-middle mb-0 tabla-pendientes">
+                <thead class="table-light">
+                    <tr>
+                        <th>Titular</th>
+                        <th class="d-mobile-none">Unidad</th>
+                        <th class="text-center d-mobile-none">Check-out</th>
+                        <th class="text-end">Saldo</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var p in Model.PendientesCobro)
+                    {
+                        <tr>
+                            <td class="fw-semibold">
+                                @p.NombreHuesped
+                                <span class="d-md-none ms-1 @(p.EsHoy ? "aloj-badge-pendiente" : "aloj-badge-checkout-hoy")">@AbrevAloj(p.NombreAlojamiento)</span>
+                            </td>
+                            <td class="d-mobile-none">@p.NombreAlojamiento</td>
+                            <td class="text-center d-mobile-none">
+                                @if (p.FechaSalida == Model.Hoy)
+                                {
+                                    <span class="badge bg-danger">Hoy</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-warning text-dark">Mañana</span>
+                                }
+                            </td>
+                            <td class="text-end fw-semibold text-danger">$@p.SaldoPendiente.ToString("N0")</td>
+                            <td class="text-end">
+                                <a asp-controller="Reservas" asp-action="Details" asp-route-id="@p.ReservaId"
+                                   class="btn btn-outline-danger btn-sm py-0">Ver</a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>
+
+@* ══════════════════════════════════════════════════════════════
+   SECCIÓN MAÑANA
+   ══════════════════════════════════════════════════════════════ *@
+<h5 class="text-uppercase text-muted fw-semibold mb-3" style="letter-spacing:.06em; font-size:1.1rem;">
+    <i class="bi bi-calendar3 me-1" style="color:#212529;"></i><strong>Mañana</strong> — @FmtFecha(Model.Manana)
+</h5>
+
+<div class="row g-3 mb-3">
+    @* Check-ins mañana *@
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header fw-semibold bg-success bg-opacity-10 text-success-emphasis">
+                <i class="bi bi-box-arrow-in-right me-1"></i>Check-ins de <strong>MAÑANA</strong>
+                <span class="badge bg-success ms-2">@Model.CheckInsManana.Count</span>
+            </div>
+            <div class="card-body p-0">
+                @if (!Model.CheckInsManana.Any())
+                {
+                    <p class="text-muted fst-italic p-3 mb-0">Sin check-ins para mañana.</p>
+                }
+                else
+                {
+                    <ul class="list-group list-group-flush lista-ver-items">
+                        @foreach (var item in Model.CheckInsManana)
+                        {
+                            <li class="list-group-item d-flex justify-content-between align-items-center py-2">
+                                <span>
+                                    <span class="fw-semibold">@item.NombreHuesped</span>
+                                    <span class="ms-1 aloj-badge-checkin">@item.NombreAlojamiento</span>
+                                </span>
+                                <a asp-controller="Reservas" asp-action="Details" asp-route-id="@item.ReservaId"
+                                   class="btn btn-outline-secondary btn-sm py-0">Ver</a>
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+        </div>
+    </div>
+
+    @* Check-outs mañana *@
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header fw-semibold bg-warning bg-opacity-10 text-warning-emphasis">
+                <i class="bi bi-box-arrow-right me-1"></i>Check-outs de <strong>MAÑANA</strong>
+                <span class="badge bg-warning text-dark ms-2">@Model.CheckOutsManana.Count</span>
+            </div>
+            <div class="card-body p-0">
+                @if (!Model.CheckOutsManana.Any())
+                {
+                    <p class="text-muted fst-italic p-3 mb-0">Sin check-outs para mañana.</p>
+                }
+                else
+                {
+                    <ul class="list-group list-group-flush lista-ver-items">
+                        @foreach (var item in Model.CheckOutsManana)
+                        {
+                            <li class="list-group-item d-flex justify-content-between align-items-center py-2">
+                                <span>
+                                    <span class="fw-semibold">@item.NombreHuesped</span>
+                                    <span class="ms-1 aloj-badge-manana">@item.NombreAlojamiento</span>
+                                </span>
+                                <a asp-controller="Reservas" asp-action="Details" asp-route-id="@item.ReservaId"
+                                   class="btn btn-outline-secondary btn-sm py-0">Ver</a>
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+        </div>
+    </div>
+</div>

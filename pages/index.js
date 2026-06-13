@@ -868,6 +868,21 @@ export default function Home() {
         });
       });
     
+    /* ===== Zona horaria Argentina ===== */
+    function getHoyArgentina() {
+      const now = new Date();
+      const formatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Argentina/Buenos_Aires',
+        year: 'numeric', month: '2-digit', day: '2-digit'
+      });
+      const [year, month, day] = formatter.format(now).split('-');
+      return new Date(Number(year), Number(month) - 1, Number(day));
+    }
+    function hoyISO() {
+      const d = getHoyArgentina();
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+    }
+
     /* ===== WhatsApp helpers ===== */
     function fmtFecha(iso) {
       // Convierte YYYY-MM-DD → DD/MM/YYYY
@@ -918,10 +933,7 @@ export default function Home() {
     }
     
     function consultarWhatsApp() {
-      const ahora = new Date();
-      const hoy = ahora.getFullYear() + '-' +
-        String(ahora.getMonth() + 1).padStart(2,'0') + '-' +
-        String(ahora.getDate()).padStart(2,'0');
+      const hoy = hoyISO();
       const llegadaH  = document.getElementById('fecha-llegada').value;
       const salidaH   = document.getElementById('fecha-salida').value;
       const huespedesH = document.getElementById('huespedes').value;
@@ -974,10 +986,7 @@ export default function Home() {
       if (el) el.classList.remove('visible');
     }
     function consultarStickyWsp() {
-      const ahora = new Date();
-      const hoy = ahora.getFullYear() + '-' +
-        String(ahora.getMonth() + 1).padStart(2,'0') + '-' +
-        String(ahora.getDate()).padStart(2,'0');
+      const hoy = hoyISO();
       const llegadaS  = document.getElementById('s-llegada').value;
       const salidaS   = document.getElementById('s-salida').value;
       const huespedesS = document.getElementById('s-huespedes').value;
@@ -1110,10 +1119,7 @@ export default function Home() {
       document.getElementById('date-modal-title').textContent = titulo;
       document.getElementById('date-modal-error').classList.remove('visible');
       const input = document.getElementById('date-modal-input');
-      const ahora = new Date();
-      const hoy = ahora.getFullYear() + '-' +
-        String(ahora.getMonth() + 1).padStart(2,'0') + '-' +
-        String(ahora.getDate()).padStart(2,'0');
+      const hoy = hoyISO();
       input.min = campo === 'salida' && document.getElementById('s-llegada').value
         ? document.getElementById('s-llegada').value : hoy;
       input.value = document.getElementById('s-' + campo).value || '';
@@ -1121,10 +1127,7 @@ export default function Home() {
       document.getElementById('date-modal-overlay').style.display = 'flex';
       // Ocultar error al cambiar la fecha
       input.onchange = function() {
-        const ahora2 = new Date();
-        const hoyCheck = ahora2.getFullYear() + '-' +
-          String(ahora2.getMonth() + 1).padStart(2,'0') + '-' +
-          String(ahora2.getDate()).padStart(2,'0');
+        const hoyCheck = hoyISO();
         if (this.value >= hoyCheck) {
           document.getElementById('date-modal-error').classList.remove('visible');
         }
@@ -1133,10 +1136,7 @@ export default function Home() {
     }
     function confirmarFechaModal() {
       const val = document.getElementById('date-modal-input').value;
-      const ahora = new Date();
-      const hoy = ahora.getFullYear() + '-' +
-        String(ahora.getMonth() + 1).padStart(2,'0') + '-' +
-        String(ahora.getDate()).padStart(2,'0');
+      const hoy = hoyISO();
       if (val && val < hoy) {
         document.getElementById('date-modal-error').classList.add('visible');
         return;
@@ -1172,10 +1172,7 @@ export default function Home() {
       document.getElementById('date-modal-overlay').addEventListener('click', function(e) {
         if (e.target === this) cerrarFechaModal();
       });
-      const ahora = new Date();
-      const hoy = ahora.getFullYear() + '-' +
-        String(ahora.getMonth() + 1).padStart(2,'0') + '-' +
-        String(ahora.getDate()).padStart(2,'0');
+      const hoy = hoyISO();
       ['s-llegada','s-salida','fecha-llegada','fecha-salida'].forEach(function(id) {
         var el = document.getElementById(id);
         if (el) el.min = hoy;
@@ -1198,10 +1195,7 @@ export default function Home() {
       ['fecha-llegada','fecha-salida'].forEach(function(id) {
         var el = document.getElementById(id);
         if (el) el.addEventListener('change', function() {
-          const ahora2 = new Date();
-          const hoyCheck = ahora2.getFullYear() + '-' +
-            String(ahora2.getMonth() + 1).padStart(2,'0') + '-' +
-            String(ahora2.getDate()).padStart(2,'0');
+          const hoyCheck = hoyISO();
           if (this.value >= hoyCheck) ocultarErrorHero();
         });
       });

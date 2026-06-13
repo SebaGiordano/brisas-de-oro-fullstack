@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - BrisasDeOro.Web</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/BrisasDeOro.Web.styles.css" asp-append-version="true" />
+    <style>
+        .navbar-nav { align-items: center; }
+        /* Botón Salir: hover y active en rojo */
+        .btn-salir:hover, .btn-salir:active, .btn-salir:focus {
+            background-color: #dc3545 !important;
+            border-color: #dc3545 !important;
+            color: #fff !important;
+        }
+        .navbar-nav .nav-link.active {
+            background-color: #0d6efd;
+            color: #fff !important;
+            border-radius: 6px;
+            font-weight: 600;
+            padding: .25rem .75rem;
+            line-height: 1.5;
+        }
+        .navbar { overflow: hidden; min-height: unset; }
+        .navbar .navbar-brand, .navbar .nav-link, .navbar .navbar-toggler { padding-top: 0; padding-bottom: 0; }
+        body { padding-top: 90px; }
+        @@media (max-width: 575.98px) { body { padding-top: 60px; } }
+        @@media (max-width: 767.98px) {
+            footer .container { white-space: normal !important; word-wrap: break-word !important; text-align: center !important; }
+            /* 5px extra de separación entre el navbar y el contenido en mobile */
+            body > .container { padding-top: 12px !important; }
+
+            /* ── Hamburger menu: permitir que el menú desplegado se vea sobre el contenido ── */
+            .navbar { overflow: visible !important; }
+
+            /* ── Panel desplegado ── */
+            .navbar-collapse.show {
+                display: flex !important;
+                flex-direction: column !important;
+                align-items: stretch !important;
+                background: #fff;
+                border-radius: 0 0 12px 12px;
+                box-shadow: 0 6px 20px rgba(0,0,0,.1);
+                padding: 8px 12px 14px;
+                width: 100%;
+            }
+
+            /* ── Lista de secciones ── */
+            .navbar-collapse.show .navbar-nav {
+                flex-direction: column !important;
+                align-items: stretch !important;
+                gap: 6px;
+                width: 100%;
+                padding: 0 !important;
+                margin: 0 !important;
+            }
+            .navbar-collapse.show .navbar-nav .nav-item { width: 100%; }
+
+            /* ── Cada sección: botón redondeado ── */
+            .navbar-collapse.show .navbar-nav .nav-link {
+                display: block !important;
+                text-align: center !important;
+                padding: 12px 16px !important;
+                border-radius: 8px !important;
+                background-color: #f1f3f5 !important;
+                color: #343a40 !important;
+                font-weight: 500 !important;
+                line-height: 1.4 !important;
+            }
+            /* Sección activa: azul con texto blanco */
+            .navbar-collapse.show .navbar-nav .nav-link.active {
+                background-color: #0d6efd !important;
+                color: #fff !important;
+            }
+
+            /* ── Fila usuario: línea divisoria + nombre izq / Salir der ── */
+            .navbar-collapse.show > div {
+                display: flex !important;
+                flex-direction: row !important;
+                justify-content: space-between !important;
+                align-items: center !important;
+                border-top: 1px solid #dee2e6 !important;
+                padding-top: 10px !important;
+                margin-top: 6px !important;
+                width: 100% !important;
+            }
+
+            /* ── Nombre de usuario: 15px ── */
+            .navbar-collapse.show > div .text-muted { font-size: 15px !important; }
+
+            /* ── Botón Salir: rojo ── */
+            .navbar-collapse.show .btn-outline-secondary {
+                border-color: #dc3545 !important;
+                color: #dc3545 !important;
+            }
+
+            /* ── Botón hamburguesa: dimensiones fijas + ícono escalado ── */
+            .navbar-toggler {
+                height: 42px !important;
+                width: 42px !important;
+                padding: 6px !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+            }
+            .navbar-toggler .navbar-toggler-icon {
+                width: 26px !important;
+                height: 26px !important;
+            }
+            /* Feedback visual inmediato al tocar un link del menú */
+            .navbar-collapse.show .navbar-nav .nav-link.nav-tap-active {
+                background-color: #0d6efd !important;
+                color: #fff !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        @{
+            var _ctrl = ViewContext.RouteData.Values["controller"]?.ToString() ?? "";
+            var _act  = ViewContext.RouteData.Values["action"]?.ToString()     ?? "";
+
+            string Activo(string ctrl, string? act = null)
+            {
+                bool match = _ctrl.Equals(ctrl, StringComparison.OrdinalIgnoreCase)
+                          && (act == null || _act.Equals(act, StringComparison.OrdinalIgnoreCase));
+                return match ? " active" : "";
+            }
+
+            // "Reservas" se activa en cualquier acción de Reservas excepto Crear
+            string ActivoReservas() =>
+                _ctrl.Equals("Reservas", StringComparison.OrdinalIgnoreCase)
+             && !_act.Equals("Crear",    StringComparison.OrdinalIgnoreCase)
+                    ? " active" : "";
+        }
+        <nav class="navbar navbar-expand-md navbar-toggleable-md navbar-light bg-white border-bottom box-shadow mb-3 fixed-top">
+            <div class="container-fluid">
+                <a class="navbar-brand" asp-area="" asp-controller="Inicio" asp-action="Index">
+                    <img src="~/images/logo.png" height="50" width="auto" alt="Brisas de Oro" style="height:50px; width:auto; object-fit:contain; display:block;" />
+                </a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
+                        aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="navbar-collapse collapse d-md-inline-flex justify-content-between">
+                    <ul class="navbar-nav flex-grow-1">
+                        <li class="nav-item">
+                            <a class="nav-link text-dark@(Activo("Inicio"))" asp-controller="Inicio" asp-action="Index">Inicio</a>
+                        </li>
+                        @if (User.Identity?.IsAuthenticated == true)
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link text-dark@(Activo("Dashboard"))" asp-controller="Dashboard" asp-action="Index">Dashboard</a>
+                            </li>
+                        }
+                        @if (User.IsInRole("Administrador") || User.IsInRole("Viewer"))
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link text-dark@(Activo("Calendario"))" asp-controller="Calendario" asp-action="Index">Calendario</a>
+                            </li>
+                        }
+                        @if (User.IsInRole("Administrador") || User.IsInRole("Viewer"))
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link text-dark@(ActivoReservas())" asp-controller="Reservas" asp-action="Index">Reservas</a>
+                            </li>
+                        }
+                        @if (User.IsInRole("Administrador") || User.IsInRole("Viewer"))
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link text-dark@(Activo("Facturacion"))" asp-controller="Facturacion" asp-action="Index">Facturación</a>
+                            </li>
+                        }
+                        @if (User.IsInRole("Administrador") || User.IsInRole("Viewer"))
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link text-dark@(Activo("Alojamientos"))" asp-controller="Alojamientos" asp-action="Index">Alojamientos</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link text-dark@(Activo("Tarifas"))" asp-controller="Tarifas" asp-action="Index">Tarifas</a>
+                            </li>
+                        }
+                        @if (User.IsInRole("Administrador"))
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link text-dark@(Activo("Usuarios"))" asp-controller="Usuarios" asp-action="Index">Usuarios</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link text-dark fw-semibold@(Activo("Reservas", "Crear"))" asp-controller="Reservas" asp-action="Crear">+ Nueva Reserva</a>
+                            </li>
+                        }
+                    </ul>
+                    @if (User.Identity?.IsAuthenticated == true)
+                    {
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="text-muted small fw-bold">@User.Identity.Name</span>
+                            <form asp-controller="Account" asp-action="Logout" method="post" class="d-inline">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="btn btn-outline-secondary btn-sm fw-bold btn-salir">Salir</button>
+                            </form>
+                        </div>
+                    }
+                </div>
+            </div>
+        </nav>
+    </header>
+    <div class="container">
+        <main role="main" class="pb-3">
+            @RenderBody()
+        </main>
+    </div>
+
+    <footer class="border-top footer text-muted">
+        <div class="container text-center">
+            <span class="d-none d-md-inline">&copy; 2026 Brisas de Oro &middot; Hotel y Cabañas &middot; Todos los derechos reservados</span>
+            <span class="d-md-none">&copy; 2026 Brisas de Oro &middot; Todos los derechos reservados</span>
+        </div>
+    </footer>
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+    <script>
+    (function () {
+        if (!('ontouchstart' in window)) return;
+        var links = document.querySelectorAll('.navbar-collapse .navbar-nav .nav-link');
+        links.forEach(function (link) {
+            link.addEventListener('touchstart', function () {
+                links.forEach(function (l) {
+                    l.classList.remove('active');
+                    l.classList.remove('nav-tap-active');
+                });
+                link.classList.add('nav-tap-active');
+            }, { passive: true });
+        });
+    })();
+    </script>
+</body>
+</html>
