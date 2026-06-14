@@ -377,7 +377,6 @@ export default function Dashboard({ user, data }) {
           #tabla-canales-wrap td:nth-child(3) { font-weight: bold !important; }
           .d-contents { display: contents; }
           @media (max-width: 767.98px) {
-            .d-mobile-none { display: none !important; }
             #filtro-btns { flex: 0 0 100% !important; max-width: 100% !important; justify-content: center !important; }
             #filtro-btns .btn { flex: 1 !important; }
             #filtro-btns a.btn { display: flex !important; align-items: center !important; justify-content: center !important; }
@@ -396,9 +395,6 @@ export default function Dashboard({ user, data }) {
             .modal-grafico .modal-content { height: auto !important; min-height: unset !important; }
             .modal-grafico .modal-footer { padding-bottom: 1rem !important; }
             .btn-grafico-container { display: flex !important; justify-content: center !important; }
-          }
-          @media (min-width: 768px) {
-            .d-desktop-none { display: none !important; }
           }
           @media (min-width: 769px) {
             #filtro-hint { flex: 0 0 100% !important; }

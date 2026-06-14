@@ -453,10 +453,6 @@ export default function GestionInicio({ data }) {
             .tabla-pendientes thead th:first-child { padding-left: 1rem !important; }
             .tabla-pendientes tbody td:last-child  { padding-right: 1rem !important; }
         }
-        /* d-mobile-none: definido en site.css en el original */
-        @media (max-width: 767.98px) {
-            .d-mobile-none { display: none !important; }
-        }
       `}</style>
     </>
   )
