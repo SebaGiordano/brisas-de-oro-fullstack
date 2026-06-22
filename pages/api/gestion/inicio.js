@@ -1,5 +1,5 @@
 import { getServerSession } from 'next-auth/next'
-import authOptions from '@/pages/api/auth/[...nextauth]'
+import { authOptions } from '@/pages/api/auth/[...nextauth]'
 import prisma from '@/lib/prisma'
 import { getHoyArgentina, addDias, argDateToUTC, toFechaArgentina, fmtFecha } from '@/lib/dates'
 

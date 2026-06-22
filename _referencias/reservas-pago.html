@@ -1,0 +1,451 @@
+@model AgregarPagoViewModel
+@{
+    ViewData["Title"] = "Registrar pago";
+    var noches     = (Model.FechaSalida - Model.FechaIngreso).Days;
+    var tarifaDia  = (noches > 0) ? (decimal?)(Model.MontoTotal / noches) : null;
+    var fromCalendario = Context.Request.Query["from"].ToString() == "calendario";
+}
+
+<style>
+    .detalle-label { font-size: .78rem; font-weight: 600; color: #6c757d; text-transform: uppercase; letter-spacing: .04em; }
+    .detalle-valor { font-size: 1rem; }
+    .saldo-cero     { color: #1A5C1A; }
+    .saldo-deuda    { color: #dc3545; font-weight: bold; }
+    .saldo-negativo { color: #198754; font-weight: bold; }
+    @@media (max-width: 767.98px) {
+        /* Botón Ver detalle de reserva: ícono y texto centrados, font-size explícito */
+        #header-pago #nav-bar-pago-mobile .btn-volver-detalle { display: flex !important; align-items: center !important; justify-content: center !important; font-size: 13px !important; }
+        /* Span visible en mobile: forzar font-size directo para anular herencia e inflación tipográfica */
+        #header-pago #nav-bar-pago-mobile .btn-volver-detalle > span.d-md-none { font-size: 13px !important; }
+        /* Botón Volver al calendario: font-size explícito con máxima especificidad */
+        #header-pago #nav-bar-pago-mobile .btn-volver-calendario { font-size: 13px !important; }
+        /* Resumen — fila 1: Titular + Alojamiento + Tarifa/día */
+        #resumen-row > div:nth-child(1) { order: 1; flex: 0 0 33.333% !important; max-width: 33.333% !important; }
+        #resumen-row > div:nth-child(2) { order: 2; flex: 0 0 33.333% !important; max-width: 33.333% !important; }
+        #resumen-row > div:nth-child(6) { order: 3; flex: 0 0 33.333% !important; max-width: 33.333% !important; }
+        /* Resumen — fila 2: Ingreso + Salida + Noches (margin-top para separar de fila 1) */
+        #resumen-row > div:nth-child(3) { order: 4; flex: 0 0 33.333% !important; max-width: 33.333% !important; margin-top: .75rem !important; }
+        #resumen-row > div:nth-child(4) { order: 5; flex: 0 0 33.333% !important; max-width: 33.333% !important; margin-top: .75rem !important; }
+        #resumen-row > div:nth-child(5) { order: 6; flex: 0 0 33.333% !important; max-width: 33.333% !important; margin-top: .75rem !important; display: flex !important; align-items: center !important; justify-content: center !important; font-weight: 700 !important; }
+        /* Header pago mobile: botones arriba del título */
+        #header-pago { flex-direction: column !important; align-items: stretch !important; justify-content: flex-start !important; }
+        #nav-bar-pago-mobile { order: -1 !important; width: 100% !important; display: flex !important; justify-content: center !important; margin-bottom: 1rem !important; }
+        /* Barra de navegación mobile (modo calendario): botones a ancho completo */
+        #nav-bar-pago-mobile .btn-nav-pago { flex: 1 !important; display: flex !important; align-items: center !important; justify-content: center !important; white-space: nowrap !important; font-size: 13px !important; }
+        /* Botones Registrar pago + Cancelar: centrados horizontalmente, contenido centrado */
+        #botones-pago { justify-content: center !important; }
+        #botones-pago .btn { display: flex !important; align-items: center !important; justify-content: center !important; }
+        /* Ocultar "Volver al calendario" del bloque de botones inferiores */
+        #botones-pago .btn-cal-pago { display: none !important; }
+        /* Resumen — separador */
+        #resumen-row > div:nth-child(7)  { order: 7;  flex: 0 0 100% !important; max-width: 100% !important; }
+        /* Resumen — totales: cada uno en su propio renglón, label izquierda · valor derecha */
+        #resumen-row > div:nth-child(8)  { order: 8;  flex: 0 0 100% !important; max-width: 100% !important; display: flex !important; justify-content: space-between !important; align-items: baseline !important; }
+        #resumen-row > div:nth-child(9)  { order: 9;  flex: 0 0 100% !important; max-width: 100% !important; display: flex !important; justify-content: space-between !important; align-items: baseline !important; }
+        #resumen-row > div:nth-child(10) { order: 10; flex: 0 0 100% !important; max-width: 100% !important; display: flex !important; justify-content: space-between !important; align-items: baseline !important; }
+        /* Sin quiebre de línea en etiquetas y valores */
+        #resumen-row .detalle-label,
+        #resumen-row .detalle-valor { white-space: nowrap !important; }
+        /* Normalizar tamaño de totales en mobile */
+        #resumen-row > div:nth-child(8) .detalle-valor,
+        #resumen-row > div:nth-child(9) .detalle-valor,
+        #resumen-row > div:nth-child(10) .detalle-valor { font-size: 1rem !important; }
+        /* Saldo pendiente: monto y leyenda alineados a la derecha */
+        #resumen-row > div:nth-child(10) .detalle-valor { text-align: right !important; }
+    }
+</style>
+
+@* ── Encabezado ── *@
+<div id="header-pago" class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0">Registrar pago</h2>
+    <div id="nav-bar-pago-mobile" class="d-flex gap-2">
+        @if (fromCalendario)
+        {
+            <a href="@Url.Action("Index", "Calendario")" class="btn btn-outline-secondary btn-sm btn-nav-pago btn-volver-calendario" style="font-size: 13px !important; white-space: nowrap !important">
+                <i class="bi bi-arrow-left me-1"></i>Volver al calendario
+            </a>
+        }
+        <a asp-controller="Reservas" asp-action="Details" asp-route-id="@Model.ReservaId"
+           asp-route-from="@(fromCalendario ? "calendario" : null)"
+           class="btn btn-outline-secondary btn-sm btn-volver-detalle btn-nav-pago" style="font-size: 13px !important; white-space: nowrap !important">
+            <i class="bi bi-arrow-left me-1"></i><span class="d-none d-md-inline">Ir al detalle de la reserva</span><span class="d-md-none">Ver detalle de reserva</span>
+        </a>
+    </div>
+</div>
+
+@* ── Resumen de la reserva (solo lectura) ── *@
+<div class="card mb-4 border-secondary">
+    <div class="card-header fw-semibold bg-light">
+        <i class="bi bi-receipt me-2"></i>Reserva #@Model.ReservaId — Resumen
+    </div>
+    <div class="card-body py-2">
+        <div id="resumen-row" class="row gx-2 gy-1">
+            <div class="col-3">
+                <div class="detalle-label">Titular</div>
+                <div class="detalle-valor fw-semibold">@Model.NombreHuesped</div>
+            </div>
+            <div class="col-3">
+                <div class="detalle-label">Alojamiento</div>
+                <div class="detalle-valor">@Model.NombreAlojamiento</div>
+            </div>
+            <div class="col-2">
+                <div class="detalle-label">Ingreso</div>
+                <div class="detalle-valor">@Model.FechaIngreso.ToString("dd/MM/yyyy")</div>
+            </div>
+            <div class="col-2">
+                <div class="detalle-label">Salida</div>
+                <div class="detalle-valor">@Model.FechaSalida.ToString("dd/MM/yyyy")</div>
+                <div class="text-muted small d-none d-md-block">(<strong>@noches noche@(noches != 1 ? "s" : "")</strong>)</div>
+            </div>
+            <div class="col-2 d-md-none text-muted small">
+                (<strong>@noches noche@(noches != 1 ? "s" : "")</strong>)
+            </div>
+            <div class="col-2">
+                <div class="detalle-label">Tarifa por día</div>
+                <div class="detalle-valor fw-semibold">
+                    @if (tarifaDia.HasValue)
+                    {
+                        <text>$@Math.Round(tarifaDia.Value, 0).ToString("N0")</text>
+                    }
+                    else
+                    {
+                        <span class="text-muted">—</span>
+                    }
+                </div>
+            </div>
+
+            <div class="col-12"><hr class="my-1" /></div>
+
+            <div class="col-4">
+                <div class="detalle-label">Total estadía</div>
+                <div class="detalle-valor fs-5 fw-semibold">$@Model.MontoTotal.ToString("N0")</div>
+            </div>
+            <div class="col-4">
+                <div class="detalle-label" style="color:#198754;font-weight:bold;">Total cobrado</div>
+                <div class="detalle-valor fs-5 text-success fw-semibold">$@Model.TotalCobrado.ToString("N0")</div>
+            </div>
+            <div class="col-4">
+                <div class="detalle-label" style="font-size:1.1rem;color:#dc3545;font-weight:bold;">Saldo pendiente</div>
+                <div class="detalle-valor @(Model.SaldoPendiente > 0 ? "saldo-deuda" : Model.SaldoPendiente < 0 ? "saldo-negativo" : "saldo-cero")" style="font-size:1.2rem;">
+                    $@Model.SaldoPendiente.ToString("N0")
+                    @if (Model.SaldoPendiente == 0)
+                    {
+                        <i class="bi bi-check-circle-fill fs-5 ms-1 text-success"></i>
+                    }
+                    @if (Model.SaldoPendiente < 0)
+                    {
+                        <span class="d-block small fw-normal mt-1" style="color:#000000 !important;">(A devolver al cliente)</span>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@* ── Calculadora de seña ── *@
+<div id="panel-sena" class="card mb-4 @(Model.TipoPago == TipoPago.Sena ? "" : "d-none")"
+     style="border-color: #90CAF9;">
+    <div class="card-body py-3" style="background-color: #E3F2FD;">
+        <div class="mb-2">
+            <i class="bi bi-calculator me-1 text-primary"></i>
+            <span class="fw-semibold text-primary small text-uppercase" style="letter-spacing:.04em">
+                Calculadora de seña
+            </span>
+        </div>
+        <div class="row g-2 align-items-center">
+            <div class="col-auto">
+                <label for="porcentaje-sena" class="form-label mb-0 small">Porcentaje:</label>
+            </div>
+            <div class="col-auto">
+                <div class="input-group input-group-sm" style="width: 120px;">
+                    <input type="number" id="porcentaje-sena" class="form-control"
+                           value="40" min="1" max="100" step="1" />
+                    <span class="input-group-text">%</span>
+                </div>
+            </div>
+            <div class="col-auto">
+                <span class="text-muted small">del total de $@Model.MontoTotal.ToString("N0")</span>
+            </div>
+        </div>
+        <div class="d-flex align-items-center gap-3 mt-3">
+            <div>
+                <span class="small text-muted">Monto sugerido:</span>
+                <span id="monto-sugerido" class="fs-5 fw-bold text-primary ms-2">$0</span>
+            </div>
+            <button type="button" id="btn-usar-monto" class="btn btn-primary btn-sm">
+                <i class="bi bi-arrow-down-circle me-1"></i>Usar este monto
+            </button>
+        </div>
+    </div>
+</div>
+
+@* ── Formulario de nuevo pago ── *@
+<div class="card">
+    <div class="card-header fw-semibold bg-light">
+        <i class="bi bi-cash-stack me-2"></i>Registrar nuevo pago
+    </div>
+    <div class="card-body">
+
+        @if (!ViewData.ModelState.IsValid)
+        {
+            <div class="alert alert-danger">
+                <strong>Corregí los siguientes errores:</strong>
+                <ul class="mb-0 mt-1">
+                    @foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+                    {
+                        <li>@error.ErrorMessage</li>
+                    }
+                </ul>
+            </div>
+        }
+
+        <div id="aviso-exceso" class="alert alert-warning d-none">
+            <i class="bi bi-exclamation-triangle me-2"></i>
+            El monto ingresado supera el saldo pendiente ($@Model.SaldoPendiente.ToString("N0")).
+            Podés guardarlo igual si corresponde (ej: pago adelantado o error a corregir).
+        </div>
+
+        <form asp-action="AgregarPago" method="post" id="form-pago" novalidate>
+            @Html.AntiForgeryToken()
+            <input type="hidden" asp-for="ReservaId" />
+
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label asp-for="TipoPago" class="form-label">
+                        Concepto <span class="text-danger">*</span>
+                    </label>
+                    <select asp-for="TipoPago" class="form-select" id="TipoPago">
+                        <option value="@TipoPago.Sena">Seña</option>
+                        <option value="@TipoPago.PagoParcial">Pago parcial</option>
+                        <option value="@TipoPago.Cancelacion">Cancelación total</option>
+                        <option value="@TipoPago.Ajuste">Ajuste / Corrección</option>
+                    </select>
+                    <span asp-validation-for="TipoPago" class="text-danger small"></span>
+                </div>
+
+                <div class="col-md-4">
+                    <label asp-for="MetodoPago" class="form-label">
+                        Método de pago <span class="text-danger">*</span>
+                    </label>
+                    <select asp-for="MetodoPago" class="form-select">
+                        <option value="@MetodoPago.Efectivo">Efectivo</option>
+                        <option value="@MetodoPago.Transferencia">Transferencia</option>
+                        <option value="@MetodoPago.TarjetaCredito">Tarjeta crédito</option>
+                        <option value="@MetodoPago.TarjetaDebito">Tarjeta débito</option>
+                    </select>
+                    <span asp-validation-for="MetodoPago" class="text-danger small"></span>
+                </div>
+
+                <div class="col-md-4">
+                    <label asp-for="Fecha" class="form-label">
+                        Fecha <span class="text-danger">*</span>
+                    </label>
+                    <input asp-for="Fecha" type="date" class="form-control" id="Fecha" />
+                    <span asp-validation-for="Fecha" class="text-danger small"></span>
+                </div>
+
+                <div class="col-md-4">
+                    <label asp-for="Monto" class="form-label">
+                        Monto <span class="text-danger">*</span>
+                    </label>
+                    <div class="input-group">
+                        <span class="input-group-text">$</span>
+                        <input asp-for="Monto" type="number" step="0.01"
+                               class="form-control" id="Monto" placeholder="0,00" />
+                    </div>
+                    <span asp-validation-for="Monto" class="text-danger small"></span>
+                </div>
+
+                <div class="col-md-8">
+                    <label asp-for="Observaciones" class="form-label">Observaciones</label>
+                    <input asp-for="Observaciones" class="form-control"
+                           placeholder="Observaciones sobre este pago (opcional)" />
+                </div>
+            </div>
+
+            <div id="botones-pago" class="d-flex gap-2 mt-4">
+                <button type="submit" class="btn btn-success px-4" id="btn-registrar-pago">
+                    <i class="bi bi-check-lg me-1"></i>Registrar pago
+                </button>
+                <a asp-controller="Reservas" asp-action="Details" asp-route-id="@Model.ReservaId"
+                   asp-route-from="@(fromCalendario ? "calendario" : null)"
+                   class="btn btn-outline-secondary btn-cancelar-pago">Cancelar</a>
+                @if (fromCalendario)
+                {
+                    <a href="@Url.Action("Index", "Calendario")" class="btn btn-outline-secondary btn-cal-pago">
+                        <i class="bi bi-arrow-left me-1"></i>Volver al calendario
+                    </a>
+                }
+            </div>
+        </form>
+    </div>
+</div>
+
+@* ── Modal de confirmación de pago ── *@
+<div class="modal fade" id="modal-confirmar-pago" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:440px;">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <h6 class="modal-title fw-semibold">Confirmar registro de pago</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body pb-2">
+                <div id="modal-pago-resumen" class="mb-3"></div>
+                <p class="mb-0" style="font-size:.9rem;">
+                    ¿Confirmás el registro de este pago? <strong>Esta acción no se puede deshacer.</strong>
+                </p>
+            </div>
+            <div class="modal-footer py-2 gap-2">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-success btn-sm" id="btn-confirmar-pago">
+                    <i class="bi bi-check-lg me-1"></i>Sí, registrar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@* ── Modal informativo: sin excedente ── *@
+<div class="modal fade" id="modal-sin-excedente" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:420px;">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <h6 class="modal-title fw-semibold">Sin excedente de pagos</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-0" style="font-size:.9rem;">
+                    No hay pagos en exceso registrados. Este concepto solo aplica cuando el
+                    total cobrado supera el monto de la estadía.
+                </p>
+            </div>
+            <div class="modal-footer py-2">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">
+                    Entendido
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{ await Html.RenderPartialAsync("_ValidationScriptsPartial"); }
+
+    <script>
+    // ── Constantes del servidor ───────────────────────────────────────────────
+    const saldoPendiente  = @Model.SaldoPendiente.ToString(System.Globalization.CultureInfo.InvariantCulture);
+    const montoTotal      = @Model.MontoTotal.ToString(System.Globalization.CultureInfo.InvariantCulture);
+    const totalCobrado    = @Model.TotalCobrado.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+    // ── Referencias DOM ───────────────────────────────────────────────────────
+    const montoInput      = document.getElementById('Monto');
+    const avisoExceso     = document.getElementById('aviso-exceso');
+    const tipoPagoSelect  = document.getElementById('TipoPago');
+    const panelSena       = document.getElementById('panel-sena');
+    const porcentajeInput = document.getElementById('porcentaje-sena');
+    const montoSugeridoEl = document.getElementById('monto-sugerido');
+    const btnUsarMonto    = document.getElementById('btn-usar-monto');
+
+    // ── Aviso de exceso de monto ──────────────────────────────────────────────
+    function verificarExceso() {
+        const monto = parseFloat(montoInput.value) || 0;
+        const esAjuste = tipoPagoSelect.value === 'Ajuste';
+        avisoExceso.classList.toggle('d-none', esAjuste || !(saldoPendiente > 0 && monto > saldoPendiente));
+    }
+
+    // ── Calculadora de seña ───────────────────────────────────────────────────
+    function calcularMontoSugerido() {
+        const pct = parseFloat(porcentajeInput.value) || 0;
+        return Math.round(montoTotal * pct / 100);
+    }
+
+    function actualizarMontoSugerido() {
+        const monto = calcularMontoSugerido();
+        montoSugeridoEl.textContent = '$' + monto.toLocaleString('es-AR');
+    }
+
+    function actualizarPanelSena() {
+        const tipo   = tipoPagoSelect.value;
+        const esSena = tipo === 'Sena';
+        panelSena.classList.toggle('d-none', !esSena);
+        if (esSena) actualizarMontoSugerido();
+
+        if (tipo === 'Ajuste') {
+            const excedente = totalCobrado - montoTotal;
+            if (excedente > 0) {
+                montoInput.value = -excedente;
+                montoInput.dispatchEvent(new Event('input'));
+            } else {
+                new bootstrap.Modal(document.getElementById('modal-sin-excedente')).show();
+            }
+        }
+    }
+
+    // Al cerrar el modal de sin excedente, volver el concepto a Cancelación
+    document.getElementById('modal-sin-excedente').addEventListener('hidden.bs.modal', function () {
+        if (tipoPagoSelect.value === 'Ajuste') {
+            tipoPagoSelect.value = 'Cancelacion';
+            actualizarPanelSena();
+            verificarExceso();
+        }
+    });
+
+    // ── Eventos ───────────────────────────────────────────────────────────────
+    tipoPagoSelect.addEventListener('change', () => { actualizarPanelSena(); verificarExceso(); });
+    porcentajeInput.addEventListener('input', actualizarMontoSugerido);
+    montoInput.addEventListener('input', verificarExceso);
+
+    btnUsarMonto.addEventListener('click', () => {
+        montoInput.value = calcularMontoSugerido();
+        montoInput.dispatchEvent(new Event('input')); // dispara verificarExceso
+        montoInput.focus();
+    });
+
+    // ── Inicialización ────────────────────────────────────────────────────────
+    actualizarPanelSena();
+    verificarExceso();
+
+    // ── Confirmación modal antes de registrar ─────────────────────────────────
+    const TIPO_LABEL   = { Sena:'Seña', PagoParcial:'Pago parcial', Cancelacion:'Cancelación total', Ajuste:'Ajuste / Corrección' };
+    const METODO_LABEL = { Efectivo:'Efectivo', Transferencia:'Transferencia',
+                           TarjetaCredito:'Tarjeta crédito', TarjetaDebito:'Tarjeta débito' };
+
+    let _confirmadoPago = false;
+
+    document.getElementById('form-pago').addEventListener('submit', function (e) {
+        if (_confirmadoPago) return;
+        e.preventDefault();
+
+        const tipo   = document.getElementById('TipoPago');
+        const monto  = document.getElementById('Monto');
+        const metodo = document.getElementById('MetodoPago');
+        const fecha  = document.getElementById('Fecha');
+
+        const montoNum  = parseFloat(monto.value) || 0;
+        const montoFmt  = '$' + Math.round(montoNum).toLocaleString('es-AR');
+        const fechaFmt  = fecha.value
+            ? new Date(fecha.value + 'T00:00:00').toLocaleDateString('es-AR', { day:'2-digit', month:'2-digit', year:'numeric' })
+            : '—';
+
+        document.getElementById('modal-pago-resumen').innerHTML =
+            `<table class="table table-sm table-borderless mb-0" style="font-size:.88rem;">
+              <tr><td class="text-muted pe-3" style="white-space:nowrap">Concepto</td>
+                  <td class="fw-semibold">${TIPO_LABEL[tipo.value] ?? tipo.value}</td></tr>
+              <tr><td class="text-muted">Monto</td>
+                  <td class="fw-semibold">${montoFmt}</td></tr>
+              <tr><td class="text-muted">Método</td>
+                  <td>${METODO_LABEL[metodo.value] ?? metodo.value}</td></tr>
+              <tr><td class="text-muted">Fecha</td>
+                  <td>${fechaFmt}</td></tr>
+            </table>`;
+
+        new bootstrap.Modal(document.getElementById('modal-confirmar-pago')).show();
+    });
+
+    document.getElementById('btn-confirmar-pago').addEventListener('click', function () {
+        _confirmadoPago = true;
+        bootstrap.Modal.getInstance(document.getElementById('modal-confirmar-pago')).hide();
+        document.getElementById('form-pago').requestSubmit();
+    });
+    </script>
+}

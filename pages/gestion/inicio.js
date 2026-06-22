@@ -1,7 +1,7 @@
 import Head from 'next/head'
 import Link from 'next/link'
 import { getServerSession } from 'next-auth/next'
-import authOptions from '@/pages/api/auth/[...nextauth]'
+import { authOptions } from '@/pages/api/auth/[...nextauth]'
 import Navbar from '@/components/gestion/Navbar'
 
 export async function getServerSideProps(context) {

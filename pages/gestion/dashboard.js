@@ -3,7 +3,7 @@ import Script from 'next/script'
 import { useRef, useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import { getServerSession } from 'next-auth/next'
-import authOptions from '@/pages/api/auth/[...nextauth]'
+import { authOptions } from '@/pages/api/auth/[...nextauth]'
 import Navbar from '@/components/gestion/Navbar'
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',

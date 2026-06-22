@@ -1,5 +1,5 @@
 import { getServerSession } from 'next-auth/next'
-import authOptions from '@/pages/api/auth/[...nextauth]'
+import { authOptions } from '@/pages/api/auth/[...nextauth]'
 import prisma from '@/lib/prisma'
 
 function getArgToday() {
@@ -105,6 +105,6 @@ export default async function handler(req, res) {
     reservas:     reservasJSON,
     alojamientos: alojamientosJSON,
     apartMap:     apartMapJSON,
-    esAdmin:      session.user.rol === 0,
+    esAdmin:      Number(session.user.rol) === 0,
   })
 }

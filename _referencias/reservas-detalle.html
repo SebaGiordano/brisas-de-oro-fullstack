@@ -1,0 +1,502 @@
+@model Reserva
+@{
+    ViewData["Title"] = $"Reserva #{Model.Id}";
+    var fromCalendario = Context.Request.Query["from"].ToString() == "calendario";
+
+    var totalCobrado   = Model.Pagos.Sum(p => p.Monto);
+    var saldoPendiente = Model.MontoTotal - totalCobrado;
+
+    string estadoPagoClase = Model.EsInvitacion      ? "pago-invitacion"
+        : totalCobrado == 0                           ? "pago-sin-sena"
+        : saldoPendiente > 0                          ? "pago-senado"
+                                                      : "pago-pagado";
+
+    string estadoPagoTexto = Model.EsInvitacion       ? "Invitación"
+        : totalCobrado == 0                           ? "Sin seña"
+        : saldoPendiente > 0                          ? "Señado"
+                                                      : "Pagado";
+
+    string estadoBadgeClase = Model.Estado switch
+    {
+        EstadoReserva.Confirmada => "bg-success",
+        EstadoReserva.Finalizada => "bg-secondary",
+        EstadoReserva.Cancelada  => "bg-danger",
+        _                        => "bg-light text-dark"
+    };
+
+    static string NombreTipoPago(TipoPago t) => t switch
+    {
+        TipoPago.Sena        => "Seña",
+        TipoPago.PagoParcial => "Pago parcial",
+        TipoPago.Cancelacion => "Cancelación",
+        TipoPago.Ajuste      => "Ajuste / Corrección",
+        _                    => t.ToString()
+    };
+
+    static string NombreMetodoPago(MetodoPago m) => m switch
+    {
+        MetodoPago.Transferencia  => "Transferencia",
+        MetodoPago.Efectivo       => "Efectivo",
+        MetodoPago.TarjetaCredito => "Tarjeta crédito",
+        MetodoPago.TarjetaDebito  => "Tarjeta débito",
+        _                         => m.ToString()
+    };
+}
+
+<style>
+    .badge-pago { display: inline-block; padding: .35em .7em; font-size: .85em; font-weight: 600; border-radius: 4px; }
+    .pago-sin-sena   { background-color: #FFCCCC; color: #7A0000; }
+    .pago-senado     { background-color: #FFF3CC; color: #7A5F00; }
+    .pago-pagado     { background-color: #CCFFCC; color: #1A5C1A; }
+    .pago-invitacion { background-color: #E0E0E0; color: #333333; }
+    .detalle-label   { font-size: .8rem; font-weight: 600; color: #6c757d; text-transform: uppercase; letter-spacing: .03em; }
+    .detalle-valor   { font-size: 1rem; }
+    @@media (max-width: 767.98px) {
+        /* Título "Datos del alojamiento": igual a "Datos del titular" (.small de Bootstrap) */
+        #titulo-datos-aloj { font-size: .875rem !important; letter-spacing: .02em !important; white-space: nowrap !important; }
+        /* Fechas y Precios: Ingreso+Egreso en fila 1, Noches+Tarifa en fila 2 */
+        #fechas-precios-row .fp-fecha { flex: 0 0 50% !important; max-width: 50% !important; }
+        /* Totales: renglón propio con label izquierda · valor derecha */
+        #fechas-precios-row .fp-total { flex: 0 0 100% !important; max-width: 100% !important; display: flex !important; justify-content: space-between !important; align-items: baseline !important; }
+        #fechas-precios-row .fp-total .detalle-label,
+        #fechas-precios-row .fp-total .detalle-valor { white-space: nowrap !important; }
+        /* Saldo pendiente: monto y leyenda alineados a la derecha; bold+rojo cuando el cliente debe */
+        #fp-saldo .detalle-valor { text-align: right !important; }
+        #fp-saldo .detalle-valor.text-danger { font-weight: bold !important; color: #dc3545 !important; }
+        /* Fecha de registro: separador arriba y abajo, fondo suave */
+        #fila-fecha-registro { border-top: 1px solid #dee2e6 !important; border-bottom: 1px solid #dee2e6 !important; background-color: #f8f9fa !important; border-radius: 4px !important; }
+        /* Botón "Agregar pago" del card header: contenido centrado */
+        .btn-agregar-pago-card { display: flex !important; align-items: center !important; justify-content: center !important; }
+        /* Tabla de pagos: ancho mínimo y sin quiebre */
+        #tabla-pagos table { min-width: 600px !important; }
+        #tabla-pagos td, #tabla-pagos th { white-space: nowrap !important; }
+        /* Botón "Ver listado de reservas" superior: contenido centrado */
+        .btn-listado-top { display: flex !important; align-items: center !important; justify-content: center !important; }
+        /* Barra de navegación mobile (modo calendario): botones a ancho completo */
+        #nav-bar-mobile .btn-nav-mobile { flex: 1 !important; display: flex !important; align-items: center !important; justify-content: center !important; }
+        /* Botones inferiores: una fila centrada, ocultar navegación redundante */
+        #detalle-acciones { flex-wrap: nowrap !important; gap: .35rem !important; justify-content: center !important; }
+        #detalle-acciones .btn { font-size: .78rem !important; padding: .35rem .65rem !important; display: flex !important; align-items: center !important; justify-content: center !important; white-space: nowrap !important; }
+        #detalle-acciones .btn-listado-bottom { display: none !important; }
+        #detalle-acciones .btn-cal-bottom { display: none !important; }
+        /* Modal de cancelación: altura adaptada al contenido */
+        #modal-cancelar-reserva .modal-dialog  { min-height: unset !important; }
+        #modal-cancelar-reserva .modal-content { height: auto !important; min-height: unset !important; max-height: 90vh !important; }
+        #modal-cancelar-reserva .modal-footer  { padding-bottom: .75rem !important; }
+    }
+    @@media (min-width: 769px) {
+        /* Fecha de registro: ancho completo, línea arriba y abajo, fondo suave, título y fecha en línea */
+        #fila-fecha-registro { flex: 0 0 100% !important; max-width: 100% !important; display: flex !important; align-items: center !important; gap: .75rem !important; border-top: 1px solid #dee2e6 !important; border-bottom: 1px solid #dee2e6 !important; background-color: #f8f9fa !important; border-radius: 0 !important; padding: .4rem .75rem !important; margin-top: 1.5rem !important; }
+        #fila-fecha-registro .detalle-label,
+        #fila-fecha-registro .detalle-valor { margin-bottom: 0 !important; }
+    }
+</style>
+
+@* ── Barra de navegación superior mobile (solo cuando se viene del calendario) ── *@
+@if (fromCalendario)
+{
+    <div id="nav-bar-mobile" class="d-md-none d-flex gap-2 mb-3">
+        <a href="@Url.Action("Index", "Calendario")" class="btn btn-outline-secondary btn-sm btn-nav-mobile">
+            <i class="bi bi-arrow-left me-1"></i>Volver al calendario
+        </a>
+        <a asp-action="Index" class="btn btn-outline-secondary btn-sm btn-nav-mobile">
+            <i class="bi bi-list me-1"></i>Ver listado de reservas
+        </a>
+    </div>
+}
+
+@* ── Encabezado ── *@
+<div class="d-flex justify-content-between align-items-start mb-4">
+    <div>
+        <h2 class="mb-1">Reserva #@Model.Id</h2>
+        <div class="d-flex gap-2 align-items-center">
+            <span class="badge @estadoBadgeClase">@Model.Estado</span>
+            <span class="badge-pago @estadoPagoClase">@estadoPagoTexto</span>
+            @if (Model.EsInvitacion)
+            {
+                <span class="text-muted small"><i class="bi bi-gift me-1"></i>Invitación</span>
+            }
+        </div>
+    </div>
+    <div class="d-flex gap-2 @(fromCalendario ? "d-none d-md-flex" : "")">
+        @if (fromCalendario)
+        {
+            <a href="@Url.Action("Index", "Calendario")" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left me-1"></i>Volver al calendario
+            </a>
+        }
+        <a asp-action="Index" class="btn btn-outline-secondary btn-sm btn-listado-top">
+            <i class="bi bi-list me-1"></i>Ver listado de reservas
+        </a>
+    </div>
+</div>
+
+@* ── Datos de la reserva ── *@
+<div class="row g-3 mb-3">
+
+    @* Columna izquierda: Información de la reserva *@
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header fw-semibold bg-light">
+                <i class="bi bi-info-circle me-2"></i>Información de la reserva
+            </div>
+            <div class="card-body">
+                <div class="row g-0">
+
+                    @* Sub-columna izquierda: Datos del titular *@
+                    <div class="col-6 pe-3 border-end">
+                        <div class="small fw-semibold text-secondary text-uppercase mb-3" style="letter-spacing:.05em">
+                            Datos del titular
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="detalle-label">Nombre del titular</div>
+                            <div class="detalle-valor fw-semibold">@Model.NombreHuesped</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="detalle-label">Teléfono</div>
+                            <div class="detalle-valor">
+                                @if (string.IsNullOrEmpty(Model.Telefono))
+                                {
+                                    <span class="text-muted fst-italic">No registrado</span>
+                                }
+                                else
+                                {
+                                    @Model.Telefono
+                                }
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="detalle-label">Canal de origen</div>
+                            <div class="detalle-valor">
+                                @if (string.IsNullOrEmpty(Model.CanalOrigen))
+                                {
+                                    <span class="text-muted">—</span>
+                                }
+                                else
+                                {
+                                    @Model.CanalOrigen
+                                }
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="detalle-label">Observaciones</div>
+                            @if (string.IsNullOrEmpty(Model.Observaciones))
+                            {
+                                <div class="detalle-valor text-muted fst-italic">Sin observaciones</div>
+                            }
+                            else if (Model.Observaciones.Length <= 80)
+                            {
+                                <div class="detalle-valor p-2 rounded" style="background-color:#FFFDE7; border:1px solid #FFF176; font-size:.9rem;">
+                                    @Model.Observaciones
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="detalle-valor p-2 rounded" style="background-color:#FFFDE7; border:1px solid #FFF176; font-size:.9rem;">
+                                    @(Model.Observaciones.Substring(0, 80))...
+                                    <button type="button" class="btn btn-link btn-sm p-0 ms-1 align-baseline"
+                                            data-bs-toggle="modal" data-bs-target="#modalObservaciones">
+                                        Ver más
+                                    </button>
+                                </div>
+                            }
+                        </div>
+
+                        <div class="mb-0">
+                            <div class="detalle-label">¿Es invitación?</div>
+                            <div class="detalle-valor">
+                                @if (Model.EsInvitacion)
+                                {
+                                    <span class="text-success fw-semibold"><i class="bi bi-check-circle-fill me-1"></i>Sí</span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">No</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    @* Sub-columna derecha: Datos del alojamiento *@
+                    <div class="col-6 ps-3">
+                        <div id="titulo-datos-aloj" class="small fw-semibold text-secondary text-uppercase mb-3" style="letter-spacing:.05em">
+                            Datos del alojamiento
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="detalle-label">Alojamiento</div>
+                            <div class="detalle-valor fw-semibold">@Model.Alojamiento.Nombre</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="detalle-label">Tipo</div>
+                            <div class="detalle-valor">@Model.Alojamiento.Tipo</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="detalle-label">Capacidad máxima</div>
+                            <div class="detalle-valor">@Model.Alojamiento.Capacidad personas</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="detalle-label">Huéspedes</div>
+                            <div class="detalle-valor">@Model.CantidadHuespedes personas</div>
+                        </div>
+
+                        <div class="mb-0">
+                            <div class="detalle-label">¿Incluye desayuno?</div>
+                            <div class="detalle-valor">
+                                @if (Model.IncluyeDesayuno)
+                                {
+                                    <span class="text-success fw-semibold"><i class="bi bi-check-circle-fill me-1"></i>Sí</span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">No</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @* Columna derecha: Fechas + Precios *@
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header fw-semibold bg-light">
+                <i class="bi bi-calendar-range me-2"></i>Fechas y precios
+            </div>
+            <div class="card-body">
+                <div id="fechas-precios-row" class="row g-3">
+                    <div class="col-sm-4 fp-fecha">
+                        <div class="detalle-label">Ingreso</div>
+                        <div class="detalle-valor">@Model.FechaIngreso.ToString("dd/MM/yyyy")</div>
+                    </div>
+                    <div class="col-sm-4 fp-fecha">
+                        <div class="detalle-label">Egreso</div>
+                        <div class="detalle-valor">@Model.FechaSalida.ToString("dd/MM/yyyy")</div>
+                    </div>
+                    <div class="col-sm-4 fp-fecha">
+                        <div class="detalle-label">Noches</div>
+                        <div class="detalle-valor fw-semibold">
+                            @((Model.FechaSalida - Model.FechaIngreso).Days)
+                        </div>
+                    </div>
+                    @{
+                        var noches = (Model.FechaSalida - Model.FechaIngreso).Days;
+                        var tarifaDia = (!Model.EsInvitacion && noches > 0)
+                            ? (decimal?)(Model.MontoTotal / noches) : null;
+                    }
+                    @if (tarifaDia.HasValue)
+                    {
+                        <div class="col-sm-4 fp-fecha">
+                            <div class="detalle-label">Tarifa por día</div>
+                            <div class="detalle-valor fw-semibold">$@Math.Round(tarifaDia.Value, 0).ToString("N0")</div>
+                        </div>
+                    }
+                    <div class="col-12"><hr class="my-1" /></div>
+                    <div class="col-sm-6 fp-total">
+                        <div class="detalle-label">Total estadía</div>
+                        <div class="detalle-valor fw-semibold fs-5">$@Model.MontoTotal.ToString("N0")</div>
+                    </div>
+                    <div class="col-sm-6 fp-total">
+                        <div class="detalle-label">Estado de pago</div>
+                        <div class="detalle-valor">
+                            <span class="badge-pago @estadoPagoClase">@estadoPagoTexto</span>
+                        </div>
+                    </div>
+                    <div class="col-sm-6 fp-total">
+                        <div class="detalle-label" style="color:#198754;font-weight:bold;">Total cobrado</div>
+                        <div class="detalle-valor text-success fw-semibold">$@totalCobrado.ToString("N0")</div>
+                    </div>
+                    <div id="fp-saldo" class="col-sm-6 fp-total">
+                        <div class="detalle-label" style="color:#dc3545;font-weight:bold;">Saldo pendiente</div>
+                        <div class="detalle-valor fw-bold @(saldoPendiente > 0 ? "text-danger" : "text-success")">
+                            $@saldoPendiente.ToString("N0")
+                            @if (saldoPendiente < 0)
+                            {
+                                <span class="d-block small fw-normal mt-1" style="color:#000000 !important;">(A devolver al cliente)</span>
+                            }
+                        </div>
+                    </div>
+                    <div id="fila-fecha-registro" class="col-sm-6 fp-total">
+                        <div class="detalle-label">Fecha de registro</div>
+                        <div class="detalle-valor text-muted small">@Model.FechaCarga.ToString("dd/MM/yyyy HH:mm")</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@* ── Pagos ── *@
+<div class="card mb-4">
+    <div class="card-header fw-semibold bg-light d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-cash-stack me-2"></i>Pagos</span>
+        @if (User.IsInRole("Administrador"))
+        {
+            <a asp-controller="Pagos" asp-action="AgregarPago" asp-route-reservaId="@Model.Id"
+               asp-route-from="@(fromCalendario ? "calendario" : null)"
+               class="btn btn-sm btn-outline-success btn-agregar-pago-card">
+                <i class="bi bi-plus-lg me-1"></i>Agregar pago
+            </a>
+        }
+    </div>
+    <div class="card-body p-0">
+        @if (!Model.Pagos.Any())
+        {
+            <div class="text-center text-muted py-4">
+                <i class="bi bi-inbox fs-3 d-block mb-1 opacity-50"></i>
+                Sin pagos registrados
+            </div>
+        }
+        else
+        {
+            <div id="tabla-pagos" class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Fecha / Hora</th>
+                            <th>Tipo</th>
+                            <th>Método</th>
+                            <th class="text-end">Monto</th>
+                            <th>Observaciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var pago in Model.Pagos)
+                        {
+                            <tr>
+                                <td class="text-nowrap">@pago.Fecha.ToString("dd/MM/yyyy | HH:mm")</td>
+                                <td>@NombreTipoPago(pago.TipoPago)</td>
+                                <td>@NombreMetodoPago(pago.MetodoPago)</td>
+                                <td class="text-end fw-semibold @(pago.Monto < 0 ? "text-danger" : "")">$@pago.Monto.ToString("N0")</td>
+                                <td class="text-muted small">@(pago.Observaciones ?? "—")</td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tfoot class="table-light fw-bold">
+                        <tr>
+                            <td colspan="3" class="text-end fw-bold">Total estadía:</td>
+                            <td class="text-end fw-bold">$@Model.MontoTotal.ToString("N0")</td>
+                            <td></td>
+                        </tr>
+                        <tr>
+                            <td colspan="3" class="text-end fw-bold">Total cobrado:</td>
+                            <td class="text-end fw-bold text-success">$@totalCobrado.ToString("N0")</td>
+                            <td></td>
+                        </tr>
+                        <tr>
+                            <td colspan="3" class="text-end fw-bold">Saldo pendiente:</td>
+                            <td class="text-end fw-bold @(saldoPendiente > 0 ? "text-danger" : "text-success")">
+                                $@saldoPendiente.ToString("N0")
+                                @if (saldoPendiente < 0)
+                                {
+                                    <span class="d-block small fw-normal" style="color:#000000 !important;">(A devolver al cliente)</span>
+                                }
+                            </td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+            <div class="d-md-none text-center text-muted" style="font-size:11px; margin-top:6px !important;">← Deslizá para ver más →</div>
+        }
+    </div>
+</div>
+
+@* ── Botones de acción ── *@
+<div id="detalle-acciones" class="d-flex flex-wrap gap-2">
+    @if (User.IsInRole("Administrador"))
+    {
+        <a asp-action="Editar" asp-route-id="@Model.Id" class="btn btn-primary">
+            <i class="bi bi-pencil me-1"></i>Editar reserva
+        </a>
+        <a asp-controller="Pagos" asp-action="AgregarPago" asp-route-reservaId="@Model.Id"
+           asp-route-from="@(fromCalendario ? "calendario" : null)"
+           class="btn btn-outline-success">
+            <i class="bi bi-plus-circle me-1"></i>Agregar pago
+        </a>
+        @if (Model.Estado != EstadoReserva.Cancelada)
+        {
+            <form asp-action="Cancelar" asp-route-id="@Model.Id" method="post" class="d-inline"
+                  id="form-cancelar-reserva">
+                @Html.AntiForgeryToken()
+                <button type="button" class="btn btn-outline-danger"
+                        data-bs-toggle="modal" data-bs-target="#modal-cancelar-reserva">
+                    <i class="bi bi-x-circle me-1"></i>Cancelar reserva
+                </button>
+            </form>
+        }
+    }
+    @if (fromCalendario)
+    {
+        <a href="@Url.Action("Index", "Calendario")" class="btn btn-outline-secondary btn-cal-bottom">
+            <i class="bi bi-arrow-left me-1"></i>Volver al calendario
+        </a>
+    }
+    <a asp-action="Index" class="btn btn-outline-secondary btn-listado-bottom @(User.IsInRole("Administrador") ? "ms-auto" : "")">
+        <i class="bi bi-list me-1"></i>Ver listado de reservas
+    </a>
+</div>
+
+@* ── Modal: Confirmar cancelación ── *@
+<div class="modal fade" id="modal-cancelar-reserva" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-semibold">Cancelar reserva</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-0">¿Estás seguro que querés cancelar la reserva de <strong>@Model.NombreHuesped</strong>? Esta acción no se puede deshacer.</p>
+            </div>
+            <div class="modal-footer">
+                <div class="d-flex gap-2 w-100">
+                    <button type="button" class="btn btn-secondary flex-fill" data-bs-dismiss="modal">No, volver</button>
+                    <button type="button" class="btn btn-danger flex-fill" id="btn-confirmar-cancelar">Sí, cancelar reserva</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+document.getElementById('btn-confirmar-cancelar').addEventListener('click', function () {
+    bootstrap.Modal.getInstance(document.getElementById('modal-cancelar-reserva')).hide();
+    document.getElementById('form-cancelar-reserva').submit();
+});
+</script>
+}
+
+@* ── Modal: Observaciones completas ── *@
+@if (!string.IsNullOrEmpty(Model.Observaciones) && Model.Observaciones.Length > 80)
+{
+    <div class="modal fade" id="modalObservaciones" tabindex="-1"
+         aria-labelledby="modalObservacionesLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalObservacionesLabel">
+                        <i class="bi bi-chat-text me-2"></i>Observaciones completas
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-0" style="white-space: pre-wrap;">@Model.Observaciones</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}

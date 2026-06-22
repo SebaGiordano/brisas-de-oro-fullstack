@@ -22,7 +22,7 @@ const ADMIN_LINKS = [
 export default function Navbar() {
   const router  = useRouter()
   const { data: session } = useSession()
-  const isAdmin = session?.user?.rol === 0
+  const isAdmin = Number(session?.user?.rol) === 0
   const links   = isAdmin ? [...NAV_LINKS, ...ADMIN_LINKS] : NAV_LINKS
 
   function isActive(href, label) {

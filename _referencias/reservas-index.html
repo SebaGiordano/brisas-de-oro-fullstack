@@ -1,0 +1,465 @@
+@model List<ReservaListItemViewModel>
+@{
+    ViewData["Title"] = "Reservas";
+    int pagina       = ViewBag.Pagina;
+    int totalPaginas = ViewBag.TotalPaginas;
+    int totalItems   = ViewBag.TotalItems;
+    string busqueda   = ViewBag.Busqueda;
+    string estado     = ViewBag.Estado;
+    string estadoPago = ViewBag.EstadoPago;
+    string desde      = ViewBag.Desde;
+    string hasta      = ViewBag.Hasta;
+}
+
+<style>
+    .badge-pago { display: inline-block; padding: .3em .65em; font-size: .8em; font-weight: 600; border-radius: 4px; white-space: nowrap; }
+    .pago-sin-sena   { background-color: #FFCCCC; color: #7A0000; }
+    .pago-senado     { background-color: #FFF3CC; color: #7A5F00; }
+    .pago-pagado     { background-color: #CCFFCC; color: #1A5C1A; }
+    .pago-invitacion { background-color: #E0E0E0; color: #333333; }
+    .table > :not(caption) > * > * { vertical-align: middle; }
+    .col-titular-res .fw-semibold { font-weight: bold !important; }
+    .col-saldo-res { font-weight: bold !important; color: #dc3545 !important; }
+    .col-saldo-negativo { background-color: #fde8e8 !important; }
+    @@media (max-width: 767.98px) {
+        .tabla-reservas-responsive { overflow-x: auto; overflow-y: auto; max-height: 400px; -webkit-overflow-scrolling: touch; }
+        .tabla-reservas-responsive table { min-width: 900px; }
+        .tabla-reservas-responsive td,
+        .tabla-reservas-responsive th { white-space: nowrap; }
+        /* Centrado vertical y horizontal dentro de botones y celda de acciones */
+        .btn { display: inline-flex !important; align-items: center; justify-content: center; }
+        /* Botones Filtrar + Limpiar: cada uno al 50% del ancho */
+        #filtros-reservas-row > div:nth-child(6),
+        #filtros-reservas-row > div:nth-child(7) { flex: 1 !important; }
+        #filtros-reservas-row > div:nth-child(6) .btn,
+        #filtros-reservas-row > div:nth-child(7) .btn { width: 100% !important; display: flex !important; }
+        /* Modal de cancelación: altura adaptada al contenido */
+        #modal-cancelar-reserva .modal-dialog  { min-height: unset !important; }
+        #modal-cancelar-reserva .modal-content { height: auto !important; min-height: unset !important; max-height: 90vh !important; }
+        #modal-cancelar-reserva .modal-footer  { padding-bottom: .75rem !important; }
+        .tabla-reservas-responsive td.text-center { vertical-align: middle; }
+        /* Encabezado fijo al hacer scroll vertical */
+        .tabla-reservas-responsive thead { position: sticky; top: 0; z-index: 4; }
+        .tabla-reservas-responsive thead th { background-color: #212529 !important; }
+        /* Columna Titular fija */
+        .col-titular-res {
+            position: sticky; left: 0; z-index: 2;
+            background-color: #fff !important;
+            box-shadow: 3px 0 6px -2px rgba(0,0,0,.15);
+            border-bottom: 1px solid #dee2e6 !important;
+        }
+        thead .col-titular-res { z-index: 3; background-color: #212529 !important; }
+        /* Titular con saldo negativo: fondo rojo claro visible sin scroll */
+        .titular-saldo-negativo { background-color: #fde8e8 !important; }
+    }
+    @@media (min-width: 769px) {
+        /* Filtros: una sola fila, campos proporcionales, margen derecho = izquierdo */
+        #filtros-reservas-row { flex-wrap: nowrap !important; }
+        #filtros-reservas-row > div:not(.col-auto) { flex: 1 !important; min-width: 0 !important; }
+    }
+</style>
+
+@* ── Encabezado ── *@
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="mb-0">Reservas</h2>
+        @if (totalItems > 0)
+        {
+            <small class="text-muted">@totalItems resultado@(totalItems != 1 ? "s" : "")</small>
+        }
+    </div>
+    <a asp-action="Crear" asp-route-from="listado" class="btn btn-primary">
+        <i class="bi bi-plus-lg me-1"></i>Nueva reserva
+    </a>
+</div>
+
+@* ── Mensajes TempData ── *@
+@if (TempData["Mensaje"] != null)
+{
+    var tipo = TempData["MensajeTipo"]?.ToString() ?? "success";
+    <div class="alert alert-@tipo alert-dismissible fade show" role="alert">
+        <i class="bi bi-@(tipo == "success" ? "check-circle" : tipo == "warning" ? "exclamation-triangle" : "info-circle") me-2"></i>
+        @TempData["Mensaje"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+@* ── Filtros ── *@
+<form method="get" class="card mb-3">
+    <div class="card-body">
+        @{
+            var opcionesEstado = new (string Val, string Label)[]
+            {
+                ("activas",    "Todas (sin canceladas)"),
+                ("proximas",   "Próximas a ingresar"),
+                ("en-curso",   "En curso"),
+                ("historicas", "Históricas"),
+                ("Cancelada",  "Canceladas"),
+                ("todas",      "Todas (incluye canceladas)")
+            };
+
+            var opcionesPago = new (string Val, string Label)[]
+            {
+                ("",           "Todos"),
+                ("sin-sena",   "Sin seña"),
+                ("senado",     "Señado"),
+                ("saldado",    "Saldado al 100%"),
+                ("invitacion", "Invitación")
+            };
+        }
+        <div id="filtros-reservas-row" class="row g-2 align-items-end">
+            <div class="col-12 col-sm-6 col-md-2">
+                <label class="form-label small fw-semibold mb-1">Buscar por nombre</label>
+                <input type="text" id="input-busqueda-reservas" name="busqueda" value="@busqueda"
+                       class="form-control" placeholder="Titular..." autocomplete="off" />
+            </div>
+            <div class="col-12 col-sm-6 col-md-2 d-mobile-none">
+                <label class="form-label small fw-semibold mb-1">Ingreso desde</label>
+                <input type="date" name="desde" value="@desde" class="form-control" />
+            </div>
+            <div class="col-12 col-sm-6 col-md-2 d-mobile-none">
+                <label class="form-label small fw-semibold mb-1">Ingreso hasta</label>
+                <input type="date" name="hasta" value="@hasta" class="form-control" />
+            </div>
+            <div class="col-12 col-sm-6 col-md-2 d-mobile-none">
+                <label class="form-label small fw-semibold mb-1">Estado de reserva</label>
+                <select name="estado" class="form-select">
+                    @foreach (var (val, label) in opcionesEstado)
+                    {
+                        if (val == estado)
+                        {
+                            <option value="@val" selected>@label</option>
+                        }
+                        else
+                        {
+                            <option value="@val">@label</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-12 col-sm-6 col-md-2">
+                <label class="form-label small fw-semibold mb-1">Estado de pago</label>
+                <select name="estadoPago" class="form-select">
+                    @foreach (var (val, label) in opcionesPago)
+                    {
+                        if (val == estadoPago)
+                        {
+                            <option value="@val" selected>@label</option>
+                        }
+                        else
+                        {
+                            <option value="@val">@label</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-outline-primary">
+                    <i class="bi bi-funnel me-1"></i>Filtrar
+                </button>
+            </div>
+            <div class="col-auto">
+                <a asp-action="Index" class="btn btn-outline-secondary">
+                    <i class="bi bi-x-lg me-1"></i>Limpiar
+                </a>
+            </div>
+        </div>
+    </div>
+</form>
+
+@section Scripts {
+<style>
+    .ac-dropdown {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        z-index: 1050;
+        background: #fff;
+        border: 1px solid #ced4da;
+        border-top: none;
+        border-radius: 0 0 .375rem .375rem;
+        max-height: 280px;
+        overflow-y: auto;
+        display: none;
+        box-shadow: 0 4px 8px rgba(0,0,0,.08);
+    }
+    .ac-dropdown li {
+        padding: .35rem .6rem;
+        font-size: .875rem;
+        cursor: pointer;
+        list-style: none;
+    }
+    .ac-dropdown li:hover,
+    .ac-dropdown li.ac-active {
+        background-color: #e9f0ff;
+        color: #0d47a1;
+    }
+</style>
+<script>
+    (function () {
+        const input = document.getElementById('input-busqueda-reservas');
+        if (!input) return;
+
+        // Envolver en contenedor con posición relativa para el dropdown
+        const wrapper = document.createElement('div');
+        wrapper.style.position = 'relative';
+        input.parentNode.insertBefore(wrapper, input);
+        wrapper.appendChild(input);
+
+        const dropdown = document.createElement('ul');
+        dropdown.className = 'ac-dropdown';
+        dropdown.setAttribute('role', 'listbox');
+        wrapper.appendChild(dropdown);
+
+        let debounce;
+
+        input.addEventListener('input', () => {
+            clearTimeout(debounce);
+            const q = input.value.trim();
+            if (q.length < 1) { dropdown.style.display = 'none'; return; }
+
+            debounce = setTimeout(async () => {
+                try {
+                    const res   = await fetch(`/Reservas/BuscarTitulares?q=${encodeURIComponent(q)}`);
+                    const items = await res.json();
+                    renderDropdown(items);
+                } catch { dropdown.style.display = 'none'; }
+            }, 220);
+        });
+
+        function renderDropdown(items) {
+            dropdown.innerHTML = '';
+            if (!items.length) { dropdown.style.display = 'none'; return; }
+            items.forEach(nombre => {
+                const li = document.createElement('li');
+                li.setAttribute('role', 'option');
+                li.textContent = nombre;
+                li.addEventListener('mousedown', e => {
+                    e.preventDefault();        // evita que el input pierda foco antes de seleccionar
+                    input.value = nombre;
+                    dropdown.style.display = 'none';
+                });
+                dropdown.appendChild(li);
+            });
+            dropdown.style.display = 'block';
+        }
+
+        // Navegación por teclado: ↑ ↓ Enter Escape
+        input.addEventListener('keydown', e => {
+            const items     = [...dropdown.querySelectorAll('li')];
+            const activeIdx = items.findIndex(li => li.classList.contains('ac-active'));
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                const next = activeIdx < items.length - 1 ? activeIdx + 1 : 0;
+                items.forEach(li => li.classList.remove('ac-active'));
+                items[next]?.classList.add('ac-active');
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                const prev = activeIdx > 0 ? activeIdx - 1 : items.length - 1;
+                items.forEach(li => li.classList.remove('ac-active'));
+                items[prev]?.classList.add('ac-active');
+            } else if (e.key === 'Enter') {
+                const active = dropdown.querySelector('li.ac-active');
+                if (active && dropdown.style.display !== 'none') {
+                    e.preventDefault();
+                    input.value = active.textContent;
+                    dropdown.style.display = 'none';
+                }
+            } else if (e.key === 'Escape') {
+                dropdown.style.display = 'none';
+            }
+        });
+
+        // Cerrar al hacer clic fuera del componente
+        document.addEventListener('click', e => {
+            if (!wrapper.contains(e.target)) dropdown.style.display = 'none';
+        });
+    })();
+
+    // ── Modal de cancelación ──────────────────────────────────────────────────
+    let _formCancelar = null;
+    document.querySelectorAll('.btn-abrir-cancelar').forEach(btn => {
+        btn.addEventListener('click', function () {
+            document.getElementById('modal-cancelar-nombre').textContent = this.dataset.nombre;
+            _formCancelar = document.getElementById(this.dataset.form);
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('modal-cancelar-reserva')).show();
+        });
+    });
+    document.getElementById('btn-confirmar-cancelar-idx').addEventListener('click', function () {
+        bootstrap.Modal.getInstance(document.getElementById('modal-cancelar-reserva')).hide();
+        _formCancelar?.submit();
+    });
+</script>
+}
+
+@* ── Tabla ── *@
+@if (!Model.Any())
+{
+    <div class="card">
+        <div class="card-body text-center text-muted py-5">
+            <i class="bi bi-calendar-x fs-1 d-block mb-2 opacity-50"></i>
+            No hay reservas registradas para los filtros seleccionados.
+        </div>
+    </div>
+}
+else
+{
+    <div class="table-responsive tabla-reservas-responsive">
+        <table class="table table-sm table-hover table-bordered align-middle mb-0">
+            <thead class="table-dark">
+                <tr>
+                    <th class="col-titular-res">Titular</th>
+                    <th>Alojamiento</th>
+                    <th class="text-center">Ingreso</th>
+                    <th class="text-center">Egreso</th>
+                    <th class="text-center">Noches</th>
+                    <th class="text-center">Pers.</th>
+                    <th class="text-center">Desayuno</th>
+                    <th class="text-end">Total</th>
+                    <th class="text-end">Cobrado</th>
+                    <th class="text-end">Saldo pendiente</th>
+                    <th class="text-center">Estado pago</th>
+                    <th class="text-center">Estado</th>
+                    <th class="text-center">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Model)
+                {
+                    <tr class="@(item.Estado == EstadoReserva.Cancelada ? "table-secondary text-muted" : "")">
+                        <td class="col-titular-res@(item.SaldoPendiente < 0 ? " titular-saldo-negativo" : "")">
+                            <span class="fw-semibold">@item.NombreHuesped</span>
+                            @if (item.EsInvitacion)
+                            {
+                                <br /><small class="text-muted"><i class="bi bi-gift me-1"></i>Invitación</small>
+                            }
+                        </td>
+                        <td>@item.NombreAlojamiento</td>
+                        <td class="text-center text-nowrap">@item.FechaIngreso.ToString("dd/MM/yyyy")</td>
+                        <td class="text-center text-nowrap">@item.FechaSalida.ToString("dd/MM/yyyy")</td>
+                        <td class="text-center">@item.CantidadNoches</td>
+                        <td class="text-center">@item.CantidadHuespedes</td>
+                        <td class="text-center">
+                            @if (item.IncluyeDesayuno)
+                            {
+                                <i class="bi bi-check-circle-fill text-success" title="Incluye desayuno"></i>
+                            }
+                            else
+                            {
+                                <i class="bi bi-x-circle-fill text-danger" title="No incluye desayuno"></i>
+                            }
+                        </td>
+                        <td class="text-end text-nowrap">$@item.MontoTotal.ToString("N0")</td>
+                        <td class="text-end text-nowrap">$@item.TotalCobrado.ToString("N0")</td>
+                        <td class="text-end text-nowrap col-saldo-res@(item.SaldoPendiente < 0 ? " col-saldo-negativo" : "")">
+                            $@item.SaldoPendiente.ToString("N0")
+                        </td>
+                        <td class="text-center">
+                            <span class="badge-pago @item.EstadoPagoClase">@item.EstadoPagoTexto</span>
+                        </td>
+                        <td class="text-center">
+                            @{
+                                var (badgeClase, badgeTexto) = item.Estado switch
+                                {
+                                    EstadoReserva.Confirmada => ("bg-success", "Confirmada"),
+                                    EstadoReserva.Finalizada => ("bg-secondary", "Finalizada"),
+                                    EstadoReserva.Cancelada  => ("bg-danger", "Cancelada"),
+                                    _                        => ("bg-light text-dark", item.Estado.ToString())
+                                };
+                            }
+                            <span class="badge @badgeClase">@badgeTexto</span>
+                        </td>
+                        <td class="text-center text-nowrap">
+                            <a asp-action="Details" asp-route-id="@item.Id"
+                               class="btn btn-outline-secondary btn-sm" title="Ver detalle">
+                                <i class="bi bi-eye"></i>
+                            </a>
+                            @if (User.IsInRole("Administrador"))
+                            {
+                                <a asp-action="Editar" asp-route-id="@item.Id" asp-route-from="listado"
+                                   class="btn btn-outline-primary btn-sm" title="Editar">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                            }
+                            @if (User.IsInRole("Administrador") && item.Estado != EstadoReserva.Cancelada)
+                            {
+                                <form asp-action="Cancelar" asp-route-id="@item.Id" method="post"
+                                      class="d-inline" id="form-cancelar-@item.Id">
+                                    @Html.AntiForgeryToken()
+                                    <button type="button" class="btn btn-outline-danger btn-sm btn-abrir-cancelar"
+                                            title="Cancelar reserva"
+                                            data-nombre="@item.NombreHuesped"
+                                            data-form="form-cancelar-@item.Id">
+                                        <i class="bi bi-x-circle"></i>
+                                    </button>
+                                </form>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    <div class="d-md-none text-center text-muted" style="font-size:11px; margin-top:6px !important;">← Deslizá para ver más →</div>
+
+    @* ── Paginación ── *@
+    @if (totalPaginas > 1)
+    {
+        <nav class="mt-3" aria-label="Páginas">
+            <ul class="pagination pagination-sm justify-content-center mb-0">
+                <li class="page-item @(pagina == 1 ? "disabled" : "")">
+                    <a class="page-link" asp-action="Index"
+                       asp-route-pagina="@(pagina - 1)"
+                       asp-route-busqueda="@busqueda"
+                       asp-route-estado="@estado"
+                       asp-route-estadoPago="@estadoPago"
+                       asp-route-desde="@desde"
+                       asp-route-hasta="@hasta">‹</a>
+                </li>
+                @for (int i = 1; i <= totalPaginas; i++)
+                {
+                    <li class="page-item @(i == pagina ? "active" : "")">
+                        <a class="page-link" asp-action="Index"
+                           asp-route-pagina="@i"
+                           asp-route-busqueda="@busqueda"
+                           asp-route-estado="@estado"
+                           asp-route-desde="@desde"
+                           asp-route-hasta="@hasta">@i</a>
+                    </li>
+                }
+                <li class="page-item @(pagina == totalPaginas ? "disabled" : "")">
+                    <a class="page-link" asp-action="Index"
+                       asp-route-pagina="@(pagina + 1)"
+                       asp-route-busqueda="@busqueda"
+                       asp-route-estado="@estado"
+                       asp-route-estadoPago="@estadoPago"
+                       asp-route-desde="@desde"
+                       asp-route-hasta="@hasta">›</a>
+                </li>
+            </ul>
+        </nav>
+    }
+}
+
+@* ── Modal: Confirmar cancelación ── *@
+<div class="modal fade" id="modal-cancelar-reserva" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-semibold">Cancelar reserva</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-0">¿Estás seguro que querés cancelar la reserva de <strong id="modal-cancelar-nombre"></strong>? Esta acción no se puede deshacer.</p>
+            </div>
+            <div class="modal-footer">
+                <div class="d-flex gap-2 w-100">
+                    <button type="button" class="btn btn-secondary flex-fill" data-bs-dismiss="modal">No, volver</button>
+                    <button type="button" class="btn btn-danger flex-fill" id="btn-confirmar-cancelar-idx">Sí, cancelar reserva</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

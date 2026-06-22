@@ -1,0 +1,646 @@
+@model EditarReservaViewModel
+@{
+    ViewData["Title"] = $"Editar Reserva #{Model.Id}";
+    var fromEditar = Context.Request.Query["from"].ToString();
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0">Editar Reserva <span class="text-muted fw-normal">#@Model.Id</span></h2>
+    @if (fromEditar == "listado")
+    {
+        <a asp-action="Index" class="btn btn-outline-secondary btn-sm btn-volver-editar">
+            <i class="bi bi-arrow-left me-1"></i>
+            <span class="d-none d-md-inline">Volver al listado de reservas</span>
+            <span class="d-md-none">Volver al listado</span>
+        </a>
+    }
+    else
+    {
+        <a asp-action="Details" asp-route-id="@Model.Id" class="btn btn-outline-secondary btn-sm btn-volver-editar">
+            <i class="bi bi-arrow-left me-1"></i>Volver al detalle
+        </a>
+    }
+</div>
+
+<div id="resumen-errores" class="alert alert-danger d-none" role="alert">
+    <strong>Corregí los siguientes errores antes de guardar:</strong>
+    <ul class="mb-0 mt-1" id="lista-errores"></ul>
+</div>
+
+<form asp-action="Editar" method="post" id="form-reserva" novalidate>
+    @Html.AntiForgeryToken()
+    <input type="hidden" asp-for="Id" />
+
+    @if (!ViewData.ModelState.IsValid)
+    {
+        <div class="alert alert-danger">
+            <strong>No se pudo guardar la reserva:</strong>
+            <ul class="mb-0 mt-1">
+                @foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+                {
+                    <li>@error.ErrorMessage</li>
+                }
+            </ul>
+        </div>
+    }
+
+    @* ── Card 1: Datos del huésped ── *@
+    <div class="card mb-3">
+        <div class="card-header fw-semibold bg-light">Datos del titular</div>
+        <div class="card-body">
+            <div class="row g-3 align-items-center">
+                <div class="col-md-7">
+                    <label asp-for="NombreHuesped" class="form-label">
+                        Nombre y apellido del titular <span class="text-danger">*</span>
+                    </label>
+                    <input asp-for="NombreHuesped" class="form-control" id="NombreHuesped"
+                           placeholder="Ej: Juan García" />
+                    <span asp-validation-for="NombreHuesped" class="text-danger small"></span>
+                </div>
+                <div class="col-md-5 pt-md-4">
+                    <div class="form-check form-check-lg border rounded p-3">
+                        <input asp-for="EsInvitacion" type="checkbox"
+                               class="form-check-input" id="EsInvitacion" />
+                        <label asp-for="EsInvitacion" class="form-check-label fw-semibold">
+                            ¿Es invitación?
+                            <span class="d-block text-muted fw-normal small">
+                                El precio queda en $0. El total es editable por colaboración voluntaria.
+                            </span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @* ── Card 2: Fechas de estadía ── *@
+    <div class="card mb-3">
+        <div class="card-header fw-semibold bg-light">Fechas de estadía</div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label asp-for="FechaIngreso" class="form-label">
+                        Fecha de ingreso <span class="text-danger">*</span>
+                    </label>
+                    <input asp-for="FechaIngreso" type="date" class="form-control" id="FechaIngreso" />
+                    <span asp-validation-for="FechaIngreso" class="text-danger small"></span>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="FechaSalida" class="form-label">
+                        Fecha de egreso <span class="text-danger">*</span>
+                    </label>
+                    <input asp-for="FechaSalida" type="date" class="form-control" id="FechaSalida" />
+                    <div class="form-text" id="egreso-hint"></div>
+                    <span asp-validation-for="FechaSalida" class="text-danger small"></span>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label text-muted">Cantidad de noches</label>
+                    <input type="text" class="form-control bg-light text-center fw-semibold"
+                           id="noches-display" readonly placeholder="Automático" />
+                    <div class="form-text">Calculado según las fechas</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @* ── Card 3: Alojamiento ── *@
+    <div class="card mb-3">
+        <div class="card-header fw-semibold bg-light">Alojamiento</div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-5">
+                    <label class="form-label">
+                        Alojamiento <span class="text-danger">*</span>
+                    </label>
+                    <select asp-for="AlojamientoId" asp-items="Model.Alojamientos"
+                            class="form-select" id="AlojamientoId">
+                        <option value="">— Seleccioná un alojamiento —</option>
+                    </select>
+                    <div id="disponibilidad-msg" class="form-text"></div>
+                    <span asp-validation-for="AlojamientoId" class="text-danger small"></span>
+                </div>
+                <div class="col-md-3">
+                    <label asp-for="CantidadHuespedes" class="form-label">
+                        Cantidad de personas <span class="text-danger">*</span>
+                    </label>
+                    <input asp-for="CantidadHuespedes" type="number" class="form-control"
+                           id="CantidadHuespedes" min="1" />
+                    <div id="capacidad-hint" class="form-text">Cargando capacidad…</div>
+                    <span asp-validation-for="CantidadHuespedes" class="text-danger small"></span>
+                </div>
+                <div class="col-md-4 d-flex align-items-center">
+                    <div class="form-check">
+                        <input asp-for="IncluyeDesayuno" type="checkbox"
+                               class="form-check-input" id="IncluyeDesayuno" />
+                        <label asp-for="IncluyeDesayuno" class="form-check-label fw-normal">
+                            ¿Incluye desayuno?
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @* ── Card 4: Precios ── *@
+    <div class="card mb-3">
+        <div class="card-header fw-semibold bg-light">Precios</div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label asp-for="PrecioPorDia" class="form-label">
+                        Precio por día <span class="text-danger">*</span>
+                    </label>
+                    <div class="input-group">
+                        <span class="input-group-text">$</span>
+                        <input asp-for="PrecioPorDia" type="number" step="0.01" min="0"
+                               class="form-control campo-inactivo" id="PrecioPorDia"
+                               placeholder="0,00" readonly />
+                    </div>
+                    <div class="form-text" id="precio-hint">
+                        Completá alojamiento y personas para habilitar
+                    </div>
+                    <span asp-validation-for="PrecioPorDia" class="text-danger small"></span>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="MontoTotal" class="form-label">
+                        Total de la estadía <span class="text-danger">*</span>
+                    </label>
+                    <div class="input-group">
+                        <span class="input-group-text">$</span>
+                        <input asp-for="MontoTotal" type="number" step="0.01" min="0"
+                               class="form-control campo-inactivo" id="MontoTotal"
+                               placeholder="0,00" readonly />
+                    </div>
+                    <div class="form-text" id="total-hint">
+                        Se calcula automáticamente (precio × noches)
+                    </div>
+                    <span asp-validation-for="MontoTotal" class="text-danger small"></span>
+                </div>
+                <div class="col-md-4 d-flex align-items-center">
+                    <div class="alert alert-info py-2 px-3 mb-0 small w-100">
+                        <strong>Editable:</strong> podés ajustar precio o total para aplicar descuentos.
+                        Si editás el total manualmente, no se recalculará automáticamente.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @* ── Card 5: Información adicional ── *@
+    <div class="card mb-4">
+        <div class="card-header fw-semibold bg-light">
+            Información adicional <span class="text-muted fw-normal small">(opcional)</span>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label asp-for="Telefono" class="form-label">Teléfono de contacto</label>
+                    <input asp-for="Telefono" type="tel" class="form-control"
+                           placeholder="+54 9 354 000-0000" />
+                    <span asp-validation-for="Telefono" class="text-danger small"></span>
+                </div>
+                <div class="col-md-3">
+                    <label asp-for="CanalOrigen" class="form-label">Canal de origen</label>
+                    <select asp-for="CanalOrigen" class="form-select">
+                        <option value="">— Sin especificar —</option>
+                        <option value="WhatsApp">WhatsApp</option>
+                        <option value="Página web">Página web</option>
+                        <option value="Recomendación">Recomendación</option>
+                        <option value="Otro">Otro</option>
+                    </select>
+                </div>
+                <div class="col-md-5">
+                    <label asp-for="Observaciones" class="form-label">Observaciones</label>
+                    <textarea asp-for="Observaciones" class="form-control" rows="2"
+                              placeholder="Sin observaciones"></textarea>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="botones-editar" class="d-flex gap-2 mb-5">
+        <button type="submit" class="btn btn-primary px-4">
+            <i class="bi bi-check-lg me-1"></i>Guardar cambios
+        </button>
+        <a asp-action="Details" asp-route-id="@Model.Id" class="btn btn-outline-secondary btn-cancelar-editar">Cancelar</a>
+    </div>
+</form>
+
+@* ── Modal de confirmación ── *@
+<div class="modal fade" id="modal-confirmar-guardado" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:460px;">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <h6 class="modal-title fw-semibold">Confirmar cambios</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" style="font-size:.92rem;">
+                ¿Confirmás que querés guardar los cambios en esta reserva? Si la reserva tiene pagos registrados, modificar fechas o montos puede afectar el saldo pendiente.
+            </div>
+            <div class="modal-footer py-2 gap-2">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary btn-sm" id="btn-confirmar-guardado">
+                    <i class="bi bi-check-lg me-1"></i>Sí, guardar cambios
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .campo-inactivo {
+        background-color: #e9ecef !important;
+        cursor: not-allowed;
+    }
+    @@media (max-width: 767.98px) {
+        .btn-volver-editar, .btn-cancelar-editar {
+            display: flex !important; align-items: center !important; justify-content: center !important;
+        }
+        /* Botones Guardar + Cancelar: centrados horizontalmente, contenido centrado */
+        #botones-editar { justify-content: center !important; }
+        #botones-editar .btn { display: flex !important; align-items: center !important; justify-content: center !important; }
+        /* Modal de confirmación: altura adaptada al contenido */
+        #modal-confirmar-guardado .modal-content { height: auto !important; min-height: unset !important; }
+        #modal-confirmar-guardado .modal-footer { padding-bottom: 1rem !important; }
+    }
+</style>
+
+@section Scripts {
+    @{ await Html.RenderPartialAsync("_ValidationScriptsPartial"); }
+
+    <script>
+    // ── Datos del servidor ────────────────────────────────────────────────────
+    const RESERVA_ID       = @Model.Id;
+    const allAlojamientos  = @Html.Raw(ViewBag.AlojamientosJson ?? "[]");
+
+    // Capacidades iniciales (todos los alojamientos) — se actualizan tras AJAX
+    let capacidades = Object.fromEntries(allAlojamientos.map(a => [String(a.id), a.capacidad]));
+
+    // ── Estado ────────────────────────────────────────────────────────────────
+    let totalFijo = false;
+    let debouncePersonas;
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+    function gid(id) { return document.getElementById(id); }
+
+    function getCapacidad() {
+        const id = gid('AlojamientoId').value;
+        return id ? (capacidades[id] ?? null) : null;
+    }
+
+    function calcularNoches() {
+        const ingreso = gid('FechaIngreso').value;
+        const egreso  = gid('FechaSalida').value;
+        if (!ingreso || !egreso) return null;
+        const diff = Math.round(
+            (new Date(egreso + 'T00:00:00') - new Date(ingreso + 'T00:00:00')) / 86400000
+        );
+        return diff > 0 ? diff : null;
+    }
+
+    function habilitarCampo(id) {
+        const el = gid(id);
+        el.readOnly = false;
+        el.classList.remove('campo-inactivo');
+    }
+
+    function bloquearCampo(id) {
+        const el = gid(id);
+        el.readOnly = true;
+        el.classList.add('campo-inactivo');
+    }
+
+    // ── Disponibilidad AJAX (excluyendo esta reserva) ────────────────────────
+    async function buscarDisponibles(prevAlojId = null) {
+        const ingreso = gid('FechaIngreso').value;
+        const egreso  = gid('FechaSalida').value;
+        if (!ingreso || !egreso) return;
+
+        const select = gid('AlojamientoId');
+        const msg    = gid('disponibilidad-msg');
+        const curVal = prevAlojId ?? select.value;
+
+        msg.className   = 'form-text text-muted';
+        msg.textContent = 'Verificando disponibilidad…';
+
+        try {
+            const url  = `/Reservas/AlojamientosDisponibles?fechaIngreso=${ingreso}` +
+                         `&fechaEgreso=${egreso}&excludeReservaId=${RESERVA_ID}`;
+            const resp = await fetch(url);
+            const data = await resp.json();
+
+            // Reconstruir opciones conservando las no-disponibles con aviso
+            const prevOpts = [...select.options].reduce((m, o) => {
+                if (o.value) m[o.value] = o.textContent;
+                return m;
+            }, {});
+
+            select.innerHTML = '';
+            const opt0 = document.createElement('option');
+            opt0.value = ''; opt0.textContent = '— Seleccioná un alojamiento —';
+            select.appendChild(opt0);
+
+            data.forEach(a => {
+                const opt = document.createElement('option');
+                opt.value = a.id; opt.textContent = a.nombre;
+                select.appendChild(opt);
+            });
+
+            capacidades = Object.fromEntries(data.map(a => [String(a.id), a.capacidad]));
+
+            if (data.length === 0) {
+                msg.className   = 'form-text text-danger fw-semibold';
+                msg.textContent = 'No hay alojamientos disponibles para las fechas seleccionadas.';
+            } else {
+                const cantUnidades = data.filter(a => !a.nombre.startsWith('Apart')).length;
+                msg.className   = 'form-text text-success';
+                msg.textContent = `${cantUnidades} de 16 unidades disponibles.`;
+            }
+
+            // Restaurar selección si sigue disponible; si no, limpiar
+            if (curVal && select.querySelector(`option[value="${curVal}"]`)) {
+                select.value = curVal;
+            } else if (curVal) {
+                select.value = '';
+                msg.className   = 'form-text text-warning fw-semibold';
+                msg.textContent = 'El alojamiento anterior no está disponible en las nuevas fechas.';
+            }
+
+            actualizarCantidadState();
+            actualizarPrecioState();
+
+        } catch {
+            msg.className   = 'form-text text-danger';
+            msg.textContent = 'Error al verificar disponibilidad.';
+        }
+    }
+
+    // ── Invitación ────────────────────────────────────────────────────────────
+    function aplicarModoInvitacion(esInvitacion) {
+        if (esInvitacion) {
+            bloquearCampo('PrecioPorDia');
+            gid('PrecioPorDia').value = '0';
+            gid('precio-hint').textContent = 'Invitación — sin costo';
+            habilitarCampo('MontoTotal');
+            if (!gid('MontoTotal').value) gid('MontoTotal').value = '0';
+            totalFijo = true;
+            gid('total-hint').textContent = 'Podés registrar una colaboración voluntaria si aplica';
+        } else {
+            totalFijo = false;
+            gid('MontoTotal').value = '';
+            gid('total-hint').textContent = 'Se calcula automáticamente (precio × noches)';
+            actualizarPrecioState();
+            actualizarNochesYTotal();
+        }
+    }
+
+    // ── Cantidad de huéspedes ─────────────────────────────────────────────────
+    function actualizarCantidadState() {
+        const cap   = getCapacidad();
+        const input = gid('CantidadHuespedes');
+        const hint  = gid('capacidad-hint');
+        if (cap) {
+            input.disabled = false;
+            input.max      = cap;
+            hint.textContent = `Capacidad máxima: ${cap} personas`;
+            if (parseInt(input.value) > cap) input.value = cap;
+        } else {
+            input.disabled = true;
+            hint.textContent = 'Seleccioná un alojamiento primero';
+        }
+    }
+
+    // ── Estado del precio ─────────────────────────────────────────────────────
+    function actualizarPrecioState() {
+        if (gid('EsInvitacion').checked) return;
+        const alojOk     = !!gid('AlojamientoId').value;
+        const personasOk = parseInt(gid('CantidadHuespedes').value) > 0;
+
+        if (alojOk && personasOk) {
+            habilitarCampo('PrecioPorDia');
+            gid('precio-hint').textContent = 'Ingresá el precio o aplicá un descuento sobre la tarifa';
+        } else {
+            bloquearCampo('PrecioPorDia');
+            gid('PrecioPorDia').value = '';
+            gid('precio-hint').textContent = 'Completá alojamiento y personas para habilitar';
+            bloquearCampo('MontoTotal');
+            gid('MontoTotal').value   = '';
+            gid('noches-display').value = '';
+            gid('total-hint').textContent = 'Se calcula automáticamente (precio × noches)';
+            totalFijo = false;
+        }
+    }
+
+    // ── Noches y total ────────────────────────────────────────────────────────
+    function actualizarNochesYTotal() {
+        if (gid('EsInvitacion').checked) return;
+        const noches = calcularNoches();
+        gid('noches-display').value = noches != null
+            ? `${noches} noche${noches !== 1 ? 's' : ''}` : '';
+
+        const precio = parseFloat(gid('PrecioPorDia').value);
+        if (noches != null && precio > 0) {
+            habilitarCampo('MontoTotal');
+            if (!totalFijo) {
+                gid('MontoTotal').value = (precio * noches).toFixed(2);
+                gid('total-hint').textContent = 'Se calcula automáticamente (precio × noches)';
+            }
+        } else if (!totalFijo) {
+            bloquearCampo('MontoTotal');
+            gid('MontoTotal').value = '';
+        }
+    }
+
+    // ── Precio sugerido (AJAX) ────────────────────────────────────────────────
+    async function consultarPrecioSugerido() {
+        if (gid('EsInvitacion').checked) return;
+        const alojId   = gid('AlojamientoId').value;
+        const personas = parseInt(gid('CantidadHuespedes').value);
+        if (!alojId || !personas || personas < 1) return;
+
+        const fecha = gid('FechaIngreso').value ?? '';
+        try {
+            const res  = await fetch(`/Reservas/ObtenerPrecioSugerido?alojamientoId=${alojId}&personas=${personas}&fechaIngreso=${fecha}`);
+            const data = await res.json();
+            const incluyeDesayuno = gid('IncluyeDesayuno').checked;
+            const precio = incluyeDesayuno ? data.precioConDesayuno : data.precioSinDesayuno;
+            if (precio != null && precio > 0) {
+                habilitarCampo('PrecioPorDia');
+                gid('PrecioPorDia').value = precio;
+                const tempLabel = data.temporada ? ` — ${data.temporada}` : '';
+                gid('precio-hint').textContent = `Tarifa configurada: $${precio}/día${tempLabel}`;
+                totalFijo = false;
+                actualizarNochesYTotal();
+            } else {
+                gid('PrecioPorDia').value = '';
+                gid('precio-hint').textContent = 'Sin tarifa configurada — ingresá el precio manualmente';
+                totalFijo = false;
+                actualizarNochesYTotal();
+            }
+        } catch { /* silencioso */ }
+    }
+
+    // ── Event listeners ───────────────────────────────────────────────────────
+
+    gid('EsInvitacion').addEventListener('change', function () {
+        aplicarModoInvitacion(this.checked);
+    });
+
+    gid('FechaIngreso').addEventListener('change', function () {
+        if (this.value) {
+            const minDate = new Date(this.value + 'T00:00:00');
+            minDate.setDate(minDate.getDate() + 1);
+            gid('FechaSalida').min = minDate.toISOString().split('T')[0];
+            if (gid('FechaSalida').value && gid('FechaSalida').value <= this.value)
+                gid('FechaSalida').value = '';
+            gid('egreso-hint').textContent = '';
+        } else {
+            gid('egreso-hint').textContent = 'Seleccioná la fecha de ingreso primero';
+        }
+        actualizarNochesYTotal();
+        if (gid('FechaIngreso').value && gid('FechaSalida').value)
+            buscarDisponibles();
+    });
+
+    gid('FechaSalida').addEventListener('change', function () {
+        actualizarNochesYTotal();
+        buscarDisponibles();
+    });
+
+    gid('AlojamientoId').addEventListener('change', function () {
+        actualizarCantidadState();
+        gid('PrecioPorDia').value = '';
+        totalFijo = false;
+        actualizarNochesYTotal();
+        gid('precio-hint').textContent = 'Buscando precio sugerido…';
+        consultarPrecioSugerido();
+    });
+
+    gid('CantidadHuespedes').addEventListener('input', function () {
+        const cap = getCapacidad();
+        if (cap && parseInt(this.value) > cap) this.value = cap;
+        if (parseInt(this.value) < 1 && this.value !== '') this.value = 1;
+        actualizarPrecioState();
+        clearTimeout(debouncePersonas);
+        debouncePersonas = setTimeout(() => {
+            gid('PrecioPorDia').value = '';
+            totalFijo = false;
+            actualizarNochesYTotal();
+            gid('precio-hint').textContent = 'Buscando precio sugerido…';
+            consultarPrecioSugerido();
+        }, 500);
+    });
+
+    gid('PrecioPorDia').addEventListener('input', function () {
+        if (!totalFijo) actualizarNochesYTotal();
+    });
+
+    gid('MontoTotal').addEventListener('input', function () {
+        if (!totalFijo) {
+            totalFijo = true;
+            gid('total-hint').textContent =
+                'Total editado manualmente — el precio por día no lo actualizará.';
+        }
+    });
+
+    // ── Validación y confirmación al enviar ──────────────────────────────────
+    let _confirmado = false;
+
+    gid('form-reserva').addEventListener('submit', function (e) {
+        const errores      = [];
+        const esInvitacion = gid('EsInvitacion').checked;
+
+        if (!gid('NombreHuesped').value.trim())
+            errores.push('El nombre del huésped es obligatorio.');
+        if (!gid('AlojamientoId').value)
+            errores.push('Seleccioná un alojamiento.');
+
+        const personas = parseInt(gid('CantidadHuespedes').value);
+        const cap      = getCapacidad();
+        if (!gid('CantidadHuespedes').value || personas < 1)
+            errores.push('La cantidad de personas es obligatoria.');
+        else if (cap && personas > cap)
+            errores.push(`La cantidad supera la capacidad máxima (${cap} personas).`);
+
+        const ingreso = gid('FechaIngreso').value;
+        const egreso  = gid('FechaSalida').value;
+        if (!ingreso) errores.push('La fecha de ingreso es obligatoria.');
+        if (!egreso)  errores.push('La fecha de egreso es obligatoria.');
+        else if (ingreso && egreso <= ingreso)
+            errores.push('La fecha de egreso debe ser posterior a la de ingreso.');
+
+        if (!esInvitacion) {
+            if (!gid('PrecioPorDia').value || parseFloat(gid('PrecioPorDia').value) <= 0)
+                errores.push('El precio por día es obligatorio.');
+            if (!gid('MontoTotal').value || parseFloat(gid('MontoTotal').value) <= 0)
+                errores.push('El total de la estadía es obligatorio.');
+        }
+
+        if (errores.length) {
+            e.preventDefault();
+            _confirmado = false;
+            gid('lista-errores').innerHTML = errores.map(m => `<li>${m}</li>`).join('');
+            gid('resumen-errores').classList.remove('d-none');
+            gid('resumen-errores').scrollIntoView({ behavior: 'smooth', block: 'start' });
+            return;
+        }
+
+        // Validación OK: si aún no fue confirmado, abrir modal y esperar
+        if (!_confirmado) {
+            e.preventDefault();
+            gid('PrecioPorDia').readOnly = false;
+            gid('MontoTotal').readOnly   = false;
+            new bootstrap.Modal(document.getElementById('modal-confirmar-guardado')).show();
+            return;
+        }
+
+        // Confirmado: habilitar campos de solo lectura y dejar enviar
+        gid('PrecioPorDia').readOnly = false;
+        gid('MontoTotal').readOnly   = false;
+    });
+
+    // ── Inicialización ────────────────────────────────────────────────────────
+    (function init() {
+        if (gid('EsInvitacion').checked) {
+            aplicarModoInvitacion(true);
+            return;
+        }
+
+        // Al editar, siempre hay alojamiento y personas pre-cargados
+        actualizarCantidadState();
+        actualizarPrecioState();
+
+        if (gid('FechaIngreso').value) {
+            const minDate = new Date(gid('FechaIngreso').value + 'T00:00:00');
+            minDate.setDate(minDate.getDate() + 1);
+            gid('FechaSalida').min = minDate.toISOString().split('T')[0];
+        }
+
+        const noches = calcularNoches();
+        if (noches != null)
+            gid('noches-display').value = `${noches} noche${noches !== 1 ? 's' : ''}`;
+
+        if (gid('PrecioPorDia').value && parseFloat(gid('PrecioPorDia').value) > 0) {
+            habilitarCampo('PrecioPorDia');
+            gid('precio-hint').textContent = 'Ingresá el precio o aplicá un descuento sobre la tarifa';
+        }
+
+        if (gid('MontoTotal').value && parseFloat(gid('MontoTotal').value) > 0) {
+            habilitarCampo('MontoTotal');
+            gid('total-hint').textContent = 'Se calcula automáticamente (precio × noches)';
+        }
+
+        // Verificar disponibilidad para las fechas actuales al cargar
+        if (gid('FechaIngreso').value && gid('FechaSalida').value)
+            buscarDisponibles(gid('AlojamientoId').value);
+    })();
+
+    // ── Confirmación modal → submit ───────────────────────────────────────────
+    document.getElementById('btn-confirmar-guardado').addEventListener('click', function () {
+        _confirmado = true;
+        bootstrap.Modal.getInstance(document.getElementById('modal-confirmar-guardado')).hide();
+        // requestSubmit dispara el evento submit (con validación), que ahora dejará pasar
+        gid('form-reserva').requestSubmit();
+    });
+    </script>
+}

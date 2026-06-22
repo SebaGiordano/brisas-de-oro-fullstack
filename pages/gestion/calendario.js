@@ -2,7 +2,7 @@ import Head from 'next/head'
 import Script from 'next/script'
 import { useEffect } from 'react'
 import { getServerSession } from 'next-auth/next'
-import authOptions from '@/pages/api/auth/[...nextauth]'
+import { authOptions } from '@/pages/api/auth/[...nextauth]'
 import Navbar from '@/components/gestion/Navbar'
 
 const EMPTY_DATA = { reservas: [], alojamientos: [], apartMap: [], esAdmin: false }

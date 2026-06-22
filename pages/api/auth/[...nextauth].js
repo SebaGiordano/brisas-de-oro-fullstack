@@ -3,7 +3,7 @@ import CredentialsProvider from 'next-auth/providers/credentials'
 import bcrypt from 'bcryptjs'
 import prisma from '@/lib/prisma'
 
-export default NextAuth({
+export const authOptions = {
   providers: [
     CredentialsProvider({
       name: 'Credentials',
@@ -38,21 +38,34 @@ export default NextAuth({
 
   session: {
     strategy: 'jwt',
+    maxAge:    30 * 24 * 60 * 60, // 30 días
+    updateAge: 0,                  // regenerar el token en cada request
   },
 
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.id = user.id
+        token.id       = user.id
         token.userName = user.userName
-        token.rol = user.rol
+        token.rol      = user.rol
+      }
+      if (token.rol === undefined && token.id) {
+        try {
+          const u = await prisma.usuario.findUnique({
+            where: { id: parseInt(token.id) },
+            select: { rol: true },
+          })
+          if (u) token.rol = u.rol
+        } catch { }
       }
       return token
     },
     async session({ session, token }) {
-      session.user.id = token.id
-      session.user.userName = token.userName
-      session.user.rol = token.rol
+      session.user = {
+        id:       token.id,
+        userName: token.userName,
+        rol:      token.rol,
+      }
       return session
     },
   },
@@ -62,4 +75,6 @@ export default NextAuth({
   },
 
   secret: process.env.NEXTAUTH_SECRET,
-})
+}
+
+export default NextAuth(authOptions)
