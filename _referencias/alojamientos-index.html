@@ -1,0 +1,162 @@
+@model List<AlojamientoListItemViewModel>
+@{
+    ViewData["Title"] = "Alojamientos";
+
+    static string NombreTipo(TipoAlojamiento t) => t switch
+    {
+        TipoAlojamiento.Habitacion => "Habitación",
+        TipoAlojamiento.Cabaña     => "Cabaña",
+        TipoAlojamiento.Apart      => "Apart",
+        _                          => t.ToString()
+    };
+
+    static string ClaseTipo(TipoAlojamiento t) => t switch
+    {
+        TipoAlojamiento.Habitacion => "bg-primary",
+        TipoAlojamiento.Cabaña     => "bg-success",
+        TipoAlojamiento.Apart      => "bg-info text-dark",
+        _                          => "bg-secondary"
+    };
+}
+
+<style>
+    .filtro-tipo-aloj { transition: background-color .15s ease, color .15s ease, border-color .15s ease; }
+    /* Azul activo uniforme — mismo tono que Tarifas */
+    .filtro-tipo-aloj.active {
+        background-color: #0d6efd !important;
+        border-color: #0d6efd !important;
+    }
+    @@media (max-width: 767.98px) {
+        .tabla-aloj-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .tabla-aloj-responsive td,
+        .tabla-aloj-responsive th { white-space: nowrap; padding: 0.5rem 0.6rem; }
+        /* Filtros: una sola línea en mobile */
+        .filtros-aloj-sticky {
+            flex-wrap: nowrap !important; overflow-x: auto;
+        }
+        .filtros-aloj-sticky .filtro-tipo-aloj {
+            font-size: 11px; padding: 3px 8px; white-space: nowrap; flex-shrink: 0;
+        }
+        .filtros-aloj-sticky .text-muted { flex-shrink: 0; font-size: 11px; }
+        /* Botones de acciones con ícono centrado */
+        .tabla-aloj-responsive .btn { display: inline-flex !important; align-items: center; justify-content: center; }
+    }
+</style>
+
+@* ── Encabezado ── *@
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0">Alojamientos</h2>
+</div>
+
+@* ── Filtro por tipo ── *@
+<div class="d-flex align-items-center gap-2 flex-wrap mb-3 filtros-aloj-sticky">
+    <span class="text-muted small fw-semibold">Filtrar por tipo:</span>
+    <button type="button" class="btn btn-primary btn-sm filtro-tipo-aloj active" data-filtro="">Todos</button>
+    <button type="button" class="btn btn-outline-secondary btn-sm filtro-tipo-aloj" data-filtro="Habitacion">Habitación</button>
+    <button type="button" class="btn btn-outline-secondary btn-sm filtro-tipo-aloj" data-filtro="Apart">Apart</button>
+    <button type="button" class="btn btn-outline-secondary btn-sm filtro-tipo-aloj" data-filtro="Cabaña">Cabaña</button>
+</div>
+
+@* ── Mensajes TempData ── *@
+@if (TempData["Mensaje"] != null)
+{
+    var tipo = TempData["MensajeTipo"]?.ToString() ?? "success";
+    <div class="alert alert-@tipo alert-dismissible fade show" role="alert">
+        <i class="bi bi-@(tipo == "success" ? "check-circle" : "exclamation-triangle") me-2"></i>
+        @TempData["Mensaje"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+@* ── Tabla ── *@
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive tabla-aloj-responsive">
+            <table class="table table-sm table-hover align-middle mb-0">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Nombre</th>
+                        <th class="text-center">Tipo</th>
+                        <th class="text-center">Capacidad</th>
+                        <th class="text-center">Estado</th>
+                        <th class="text-center">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var a in Model)
+                    {
+                        <tr class="@(!a.Activo ? "table-secondary text-muted" : "")" data-tipo="@a.Tipo">
+                            <td class="fw-semibold">@a.Nombre</td>
+                            <td class="text-center">
+                                <span class="badge @ClaseTipo(a.Tipo)">@NombreTipo(a.Tipo)</span>
+                            </td>
+                            <td class="text-center">@a.Capacidad personas</td>
+                            <td class="text-center">
+                                @if (a.Activo)
+                                {
+                                    <span class="badge bg-success">Activo</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-danger">Inactivo</span>
+                                }
+                            </td>
+                            <td class="text-center text-nowrap">
+                                <a asp-action="Editar" asp-route-id="@a.Id"
+                                   class="btn btn-outline-primary btn-sm" title="Editar">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                @if (a.Activo)
+                                {
+                                    <form asp-action="Desactivar" asp-route-id="@a.Id"
+                                          method="post" class="d-inline"
+                                          onsubmit="return confirm('¿Desactivar @Html.Raw(a.Nombre.Replace("'", "\\'"))? No aparecerá en el formulario de nueva reserva.')">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="btn btn-outline-warning btn-sm" title="Desactivar">
+                                            <i class="bi bi-eye-slash"></i>
+                                        </button>
+                                    </form>
+                                }
+                                else
+                                {
+                                    <form asp-action="Activar" asp-route-id="@a.Id"
+                                          method="post" class="d-inline">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="btn btn-outline-success btn-sm" title="Activar">
+                                            <i class="bi bi-eye"></i>
+                                        </button>
+                                    </form>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <div class="d-md-none text-center text-muted" style="font-size:11px; margin-top:6px !important;">← Deslizá para ver más →</div>
+    </div>
+</div>
+<div class="text-muted small mt-2">
+    @Model.Count alojamiento@(Model.Count != 1 ? "s" : "") registrado@(Model.Count != 1 ? "s" : "")
+    · @Model.Count(a => a.Activo) activo@(Model.Count(a => a.Activo) != 1 ? "s" : "")
+</div>
+
+@section Scripts {
+<script>
+(function () {
+    const botones = document.querySelectorAll('.filtro-tipo-aloj');
+    const filas   = document.querySelectorAll('tbody tr[data-tipo]');
+
+    botones.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const filtro = btn.dataset.filtro;
+            botones.forEach(b => { b.className = 'btn btn-outline-secondary btn-sm filtro-tipo-aloj'; });
+            btn.className = 'btn btn-primary btn-sm filtro-tipo-aloj active';
+            filas.forEach(tr => {
+                tr.style.display = (!filtro || tr.dataset.tipo === filtro) ? '' : 'none';
+            });
+        });
+    });
+})();
+</script>
+}
