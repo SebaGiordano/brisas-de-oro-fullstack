@@ -1,0 +1,597 @@
+@model TarifasIndexViewModel
+@{
+    ViewData["Title"] = "Tarifas";
+
+    var ultimoAjuste = ViewBag.UltimoAjuste as string;
+}
+
+@* ── Encabezado ── *@
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0">Tarifas</h2>
+</div>
+
+@* ── Barra superior: filtro | pestañas temporada | gestión de precios ── *@
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-start mb-3 gap-3 barra-superior-tarifas">
+
+    @* Filtro por tipo — izquierda *@
+    <div class="d-flex align-items-center gap-2 flex-wrap pt-1 filtros-tipo-tarifas">
+        <span class="text-muted small fw-semibold">Filtrar por tipo:</span>
+        <button type="button" class="btn btn-primary btn-sm filtro-tipo active" data-filtro="">Todos</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm filtro-tipo" data-filtro="Habitacion">Habitación</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm filtro-tipo" data-filtro="Apart">Apart</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm filtro-tipo" data-filtro="Cabaña">Cabaña</button>
+    </div>
+
+    @* Pestañas de temporada — centro *@
+    @if (Model.Temporadas.Any())
+    {
+        <div class="d-flex flex-column gap-1 px-4 temporadas-tarifas">
+            @foreach (var t in Model.Temporadas.OrderBy(t => t.FechaInicio))
+            {
+                var esActiva = t.Id == Model.TemporadaActivaId;
+                var btnClass = esActiva ? "btn-primary" : "btn-outline-secondary";
+                <a href="?temporadaId=@t.Id" class="btn @btnClass btn-sm">@t.Nombre</a>
+            }
+            <button type="button" class="btn btn-outline-secondary btn-sm"
+                    data-bs-toggle="modal" data-bs-target="#modal-temporadas">
+                Configurar
+            </button>
+        </div>
+    }
+
+    @* Gestión de precios — derecha (oculto en mobile) *@
+    <div class="d-mobile-none">
+        <div class="card border-secondary">
+            <div class="card-header fw-semibold bg-light py-2">
+                <i class="bi bi-percent me-1"></i>Gestión de precios
+            </div>
+            <div class="card-body py-2 px-3">
+                <div class="d-flex align-items-end gap-2 flex-wrap">
+                    <div>
+                        <label for="aj-pct" class="form-label small mb-1">Porcentaje</label>
+                        <div class="input-group input-group-sm">
+                            <input type="number" id="aj-pct" class="form-control" style="width:60px"
+                                   placeholder="10" step="1" min="-99" max="1000" />
+                            <span class="input-group-text">%</span>
+                        </div>
+                    </div>
+                    <div>
+                        <label for="aj-tipo" class="form-label small mb-1">Aplicar a</label>
+                        <select id="aj-tipo" class="form-select form-select-sm" style="width:auto">
+                            <option value="todos">Todos</option>
+                            <option value="habitacion">Habitaciones</option>
+                            <option value="cabaña">Cabañas</option>
+                            <option value="apart">Aparts</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="aj-servicio" class="form-label small mb-1">Servicio</label>
+                        <select id="aj-servicio" class="form-select form-select-sm" style="width:auto">
+                            <option value="ambos">Ambos</option>
+                            <option value="con-desayuno">Con desayuno</option>
+                            <option value="sin-desayuno">Sin desayuno</option>
+                        </select>
+                    </div>
+                    <div class="pb-1">
+                        <button type="button" id="btn-aj-aplicar" class="btn btn-warning btn-sm">
+                            <i class="bi bi-calculator me-1"></i>Aplicar
+                        </button>
+                    </div>
+                </div>
+
+                @if (ultimoAjuste != null)
+                {
+                    var partes = ultimoAjuste.Split('|');
+                    <div class="mt-2 pt-2 border-top small text-muted">
+                        <i class="bi bi-clock-history me-1"></i>
+                        <strong>Último ajuste:</strong> @string.Join(" — ", partes)
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+</div>
+
+@* ── Mensajes TempData ── *@
+@if (TempData["Mensaje"] != null)
+{
+    var tipo = TempData["MensajeTipo"]?.ToString() ?? "success";
+    <div class="alert alert-@tipo alert-dismissible fade show" role="alert">
+        <i class="bi bi-@(tipo == "success" ? "check-circle" : "exclamation-triangle") me-2"></i>
+        @TempData["Mensaje"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+@* ── Modal de confirmación de ajuste ── *@
+<div class="modal fade" id="modal-ajuste" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:460px;">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <h6 class="modal-title fw-semibold">Confirmar ajuste de precios</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="modal-aj-texto" style="font-size:.92rem;"></div>
+            <div class="modal-footer py-2 gap-2">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                <form asp-action="AjustarPrecios" method="post" id="form-ajuste" class="d-inline">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="porcentaje"  id="hid-pct" />
+                    <input type="hidden" name="tipoAloj"    id="hid-tipo" />
+                    <input type="hidden" name="servicio"    id="hid-servicio" />
+                    <input type="hidden" name="temporadaId" id="hid-temporada" value="@Model.TemporadaActivaId" />
+                    <button type="submit" class="btn btn-warning btn-sm">
+                        <i class="bi bi-check-lg me-1"></i>Confirmar
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@* ── Modal de configuración de temporadas ── *@
+<div class="modal fade" id="modal-temporadas" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:480px;">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <h6 class="modal-title fw-semibold">
+                    <i class="bi bi-calendar-range me-1"></i>Configurar temporadas
+                </h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form asp-action="GuardarTemporadas" method="post">
+                @Html.AntiForgeryToken()
+                <div class="modal-body py-3">
+                    @for (int i = 0; i < Model.Temporadas.Count; i++)
+                    {
+                        var temp = Model.Temporadas[i];
+                        <input type="hidden" name="items[@i].Id" value="@temp.Id" />
+                        <div class="mb-3">
+                            <div class="fw-semibold mb-2">@temp.Nombre</div>
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <label class="form-label small mb-1">Fecha inicio</label>
+                                    <input type="date" name="items[@i].FechaInicio"
+                                           value="@temp.FechaInicio.ToString("yyyy-MM-dd")"
+                                           class="form-control form-control-sm" />
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label small mb-1">Fecha fin</label>
+                                    <input type="date" name="items[@i].FechaFin"
+                                           value="@temp.FechaFin.ToString("yyyy-MM-dd")"
+                                           class="form-control form-control-sm" />
+                                </div>
+                            </div>
+                        </div>
+                        @if (i < Model.Temporadas.Count - 1)
+                        {
+                            <hr class="my-2" />
+                        }
+                    }
+                </div>
+                <div class="modal-footer py-2 gap-2">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <i class="bi bi-check-lg me-1"></i>Guardar fechas
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@* ── Modal edición de grupo ── *@
+<div class="modal fade" id="modal-editar-grupo" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:540px;">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <h6 class="modal-title fw-semibold" id="modal-eg-titulo">Editar tarifa</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form asp-action="EditarGrupo" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="temporadaId" value="@Model.TemporadaActivaId" />
+                <input type="hidden" name="cantPersonas" id="modal-eg-pers" />
+                <div class="modal-body" id="modal-eg-body" style="max-height:70vh;overflow-y:auto;">
+                    @* filas generadas por JS *@
+                </div>
+                <div class="modal-footer py-2 gap-2">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary btn-sm px-4">
+                        <i class="bi bi-check-lg me-1"></i>Guardar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<style>
+    .filtro-tipo { transition: background-color .15s ease, color .15s ease, border-color .15s ease; }
+    /* Azul activo uniforme para ambas filas de filtros — desktop y mobile */
+    .temporadas-tarifas .btn-primary {
+        background-color: #0d6efd !important;
+        border-color: #0d6efd !important;
+    }
+    .filtros-tipo-tarifas .filtro-tipo.active {
+        background-color: #0d6efd !important;
+        border-color: #0d6efd !important;
+    }
+    @@media (min-width: 769px) {
+        .barra-superior-tarifas { align-items: stretch !important; }
+        .barra-superior-tarifas .temporadas-tarifas { justify-content: space-between !important; }
+    }
+    @@media (max-width: 767.98px) {
+        /* Filtro por tipo: ancho completo, botones distribuidos */
+        .filtros-tipo-tarifas {
+            width: 100% !important; flex-wrap: wrap !important; gap: 4px !important; padding-top: 0 !important;
+        }
+        .filtros-tipo-tarifas > span { width: 100%; margin-bottom: 2px; }
+        .filtros-tipo-tarifas .filtro-tipo {
+            flex: 1 !important; font-size: 12px !important; padding: 5px 4px !important;
+            display: flex !important; align-items: center !important; justify-content: center !important;
+        }
+        /* Temporadas + Configurar: ancho completo, botones distribuidos */
+        .temporadas-tarifas {
+            flex-direction: row !important; flex-wrap: nowrap !important;
+            width: 100% !important; gap: 4px !important; padding: 0 !important;
+        }
+        .temporadas-tarifas .btn {
+            flex: 1 !important; font-size: 12px !important; padding: 5px 4px !important;
+            white-space: nowrap; display: flex !important; align-items: center !important; justify-content: center !important;
+        }
+        /* Negrita adicional en temporada activa solo en mobile */
+        .temporadas-tarifas .btn-primary { font-weight: 700 !important; }
+        /* Modal de temporadas: altura adaptada al contenido */
+        #modal-temporadas .modal-content { min-height: unset !important; height: auto !important; }
+        #modal-temporadas .modal-body .row { align-items: center; }
+        #modal-temporadas .form-control { display: flex; align-items: center; }
+        /* Modal edición de grupo: altura adaptada al contenido */
+        #modal-editar-grupo .modal-dialog  { min-height: unset !important; }
+        #modal-editar-grupo .modal-content { height: auto !important; min-height: unset !important; max-height: 90vh !important; }
+        #modal-editar-grupo .modal-footer  { padding-bottom: .5rem !important; }
+        /* Modal edición de grupo: tabla compacta */
+        #modal-editar-grupo .modal-body { padding: .5rem; }
+        #modal-editar-grupo .table th,
+        #modal-editar-grupo .table td { padding: .25rem .3rem; font-size: .75rem; }
+        #modal-editar-grupo .input-group-text { padding: .2rem .3rem; font-size: .75rem; }
+        #modal-editar-grupo .form-control  { font-size: .75rem; }
+    }
+</style>
+<script>
+(function () {
+    // ── Modal edición de grupo ────────────────────────────────────────────────
+    const abreviarNombre = n => n
+        .replace(/^Habitación\s+/, 'Hab. ')
+        .replace(/^Apart\s+/,     'Ap. ')
+        .replace(/^Cabaña\s+/,    'Cab. ');
+
+    document.querySelectorAll('.tar-edit-btn').forEach(btn => {
+        btn.addEventListener('click', function () {
+            const label = this.dataset.label;
+            const pers  = parseInt(this.dataset.pers);
+            const filas = JSON.parse(this.dataset.filas);
+
+            document.getElementById('modal-eg-titulo').textContent =
+                `${label} — ${pers} persona${pers !== 1 ? 's' : ''}`;
+            document.getElementById('modal-eg-pers').value = pers;
+
+            const enc = s => String(s)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+            let tbody = '';
+            filas.forEach((f, i) => {
+                const corto = enc(abreviarNombre(f.nombre));
+                const largo = enc(f.nombre);
+                tbody += `
+              <tr>
+                <td class="fw-semibold align-middle">
+                  <span class="d-none d-md-inline">${largo}</span>
+                  <span class="d-md-none">${corto}</span>
+                </td>
+                <td>
+                  <input type="hidden" name="filas[${i}].TarifaId"      value="${f.id}" />
+                  <input type="hidden" name="filas[${i}].AlojamientoId" value="${f.alojId}" />
+                  <div class="input-group input-group-sm">
+                    <span class="input-group-text">$</span>
+                    <input type="number" name="filas[${i}].PrecioConDesayuno"
+                           class="form-control" min="0" step="1" required value="${f.cd}" />
+                  </div>
+                </td>
+                <td>
+                  <div class="input-group input-group-sm">
+                    <span class="input-group-text">$</span>
+                    <input type="number" name="filas[${i}].PrecioSinDesayuno"
+                           class="form-control" min="0" step="1" required value="${f.sd}" />
+                  </div>
+                </td>
+              </tr>`;
+            });
+
+            document.getElementById('modal-eg-body').innerHTML = `
+            <table class="table table-sm table-bordered mb-0">
+              <colgroup><col style="width:36%"><col style="width:32%"><col style="width:32%"></colgroup>
+              <thead class="table-light">
+                <tr>
+                  <th><span class="d-none d-md-inline">Alojamiento</span><span class="d-md-none">Aloj.</span></th>
+                  <th><span class="d-none d-md-inline">Con desayuno</span><span class="d-md-none">C/D</span></th>
+                  <th><span class="d-none d-md-inline">Sin desayuno</span><span class="d-md-none">S/D</span></th>
+                </tr>
+              </thead>
+              <tbody>${tbody}</tbody>
+            </table>`;
+
+            bootstrap.Modal.getOrCreateInstance(
+                document.getElementById('modal-editar-grupo')).show();
+        });
+    });
+
+    // ── Filtro por tipo ────────────────────────────────────────────────────────
+    const botones = document.querySelectorAll('.filtro-tipo');
+    const bloques = document.querySelectorAll('tbody[data-tipo]');
+
+    botones.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const filtro = btn.dataset.filtro;
+            botones.forEach(b => { b.className = 'btn btn-outline-secondary btn-sm filtro-tipo'; });
+            btn.className = 'btn btn-primary btn-sm filtro-tipo active';
+            bloques.forEach(tb => {
+                tb.style.display = (!filtro || tb.dataset.tipo === filtro) ? '' : 'none';
+            });
+        });
+    });
+
+    // ── Gestión de precios ────────────────────────────────────────────────────
+    const TIPO_LABELS = {
+        'todos':      'todas las unidades',
+        'habitacion': 'todas las Habitaciones',
+        'cabaña':     'todas las Cabañas',
+        'apart':      'todos los Aparts'
+    };
+    const SERV_LABELS = {
+        'ambos':        'ambos servicios',
+        'con-desayuno': 'Con desayuno',
+        'sin-desayuno': 'Sin desayuno'
+    };
+
+    document.getElementById('btn-aj-aplicar').addEventListener('click', () => {
+        const pctInput = document.getElementById('aj-pct');
+        const pct      = parseFloat(pctInput.value);
+        if (!pct || pct === 0) { pctInput.focus(); return; }
+
+        const tipo = document.getElementById('aj-tipo').value;
+        const serv = document.getElementById('aj-servicio').value;
+
+        const accion   = pct > 0
+            ? `un <strong>aumento del ${pct}%</strong>`
+            : `una <strong>reducción del ${Math.abs(pct)}%</strong>`;
+        const servPart = serv === 'ambos'
+            ? `a <strong>${SERV_LABELS[serv]}</strong>`
+            : `al servicio <strong>${SERV_LABELS[serv]}</strong>`;
+        const tipoText  = TIPO_LABELS[tipo] ?? tipo;
+        const tempNombre = document.getElementById('hid-temporada').value
+            ? document.querySelector(`a.btn-primary[href*="temporadaId"]`)?.textContent?.trim() ?? ''
+            : '';
+        const tempPart = tempNombre ? ` (${tempNombre})` : '';
+
+        document.getElementById('modal-aj-texto').innerHTML =
+            `Estás por aplicar ${accion} ${servPart} de <strong>${tipoText}</strong>${tempPart}. ¿Confirmás el cambio?`;
+
+        document.getElementById('hid-pct').value      = pct;
+        document.getElementById('hid-tipo').value     = tipo;
+        document.getElementById('hid-servicio').value = serv;
+
+        new bootstrap.Modal(document.getElementById('modal-ajuste')).show();
+    });
+})();
+</script>
+}
+
+@* ── Tabla agrupada ── *@
+@{
+    // ── Fuentes por categoría ────────────────────────────────────────────────
+    var srcHab    = Model.Grupos.Where(g => g.Tipo == TipoAlojamiento.Habitacion).ToList();
+    var srcApart  = Model.Grupos.Where(g => g.Tipo == TipoAlojamiento.Apart).ToList();
+    var srcCChica = Model.Grupos.Where(g => g.Tipo == TipoAlojamiento.Cabaña
+                                         && g.NombreAlojamiento == "Cabaña 7").ToList();
+    var srcCMed   = Model.Grupos.Where(g => g.Tipo == TipoAlojamiento.Cabaña
+                                         && g.NombreAlojamiento != "Cabaña 7"
+                                         && g.NombreAlojamiento != "Cabaña 8").ToList();
+    var srcCGrand = Model.Grupos.Where(g => g.Tipo == TipoAlojamiento.Cabaña
+                                         && g.NombreAlojamiento == "Cabaña 8").ToList();
+
+    // ── Tipo de fila precomputada ─────────────────────────────────────────────
+    // (RowIndex, CantPersonas, RowSpan, CD promedio, SD promedio, FilasJson para modal)
+    List<(int Idx, int Pers, int Span, decimal CD, decimal SD, string FilasJson)>
+    BuildRows(List<TarifaGrupoViewModel> src, int[] personas,
+              Func<TarifaGrupoViewModel, int, bool>? alojFilter = null)
+    {
+        var result = new List<(int, int, int, decimal, decimal, string)>();
+        for (int i = 0; i < personas.Length; i++)
+        {
+            int p      = personas[i];
+            var srcFil = alojFilter == null ? src : src.Where(g => alojFilter(g, p)).ToList();
+            var tars   = srcFil.SelectMany(g => g.Tarifas.Where(t => t.CantidadPersonas == p)).ToList();
+            var cds    = tars.Where(t => t.PrecioConDesayuno > 0).Select(t => t.PrecioConDesayuno).ToList();
+            var sds    = tars.Where(t => t.PrecioSinDesayuno > 0).Select(t => t.PrecioSinDesayuno).ToList();
+
+            var filasList = srcFil.Select(g => {
+                var tar = g.Tarifas.FirstOrDefault(t => t.CantidadPersonas == p);
+                return new {
+                    id     = tar?.Id ?? 0,
+                    alojId = g.AlojamientoId,
+                    nombre = g.NombreAlojamiento,
+                    cd     = tar?.PrecioConDesayuno ?? 0m,
+                    sd     = tar?.PrecioSinDesayuno ?? 0m
+                };
+            }).ToArray();
+
+            result.Add((i, p, personas.Length,
+                cds.Any() ? Math.Round(cds.Average()) : 0m,
+                sds.Any() ? Math.Round(sds.Average()) : 0m,
+                System.Text.Json.JsonSerializer.Serialize(filasList)));
+        }
+        return result;
+    }
+
+    // ── Grupos para renderizar ────────────────────────────────────────────────
+    var tablaGrupos = new (string Label, string Tipo, bool Activo,
+        List<(int Idx, int Pers, int Span, decimal CD, decimal SD, string FilasJson)> Rows)[]
+    {
+        ("HABITACIONES",   "Habitacion", srcHab.Any(),    BuildRows(srcHab,    new[]{1,2,3,4})),
+        ("APART",          "Apart",      srcApart.Any(),  BuildRows(srcApart,  new[]{2,3,4,5},
+            (g, p) => p == 2
+                ? g.NombreAlojamiento.StartsWith("Habitación")
+                : g.NombreAlojamiento.StartsWith("Apart"))),
+        ("CABAÑA CHICA",   "Cabaña",     srcCChica.Any(), BuildRows(srcCChica, new[]{1,2,3})),
+        ("CABAÑA MEDIANA", "Cabaña",     srcCMed.Any(),   BuildRows(srcCMed,   new[]{1,2,3,4,5,6})),
+        ("CABAÑA GRANDE",  "Cabaña",     srcCGrand.Any(), BuildRows(srcCGrand, new[]{3,4,5,6,7,8})),
+    };
+}
+
+@if (!Model.Grupos.Any())
+{
+    <div class="alert alert-info">
+        @if (!Model.Temporadas.Any())
+        {
+            <span>No hay temporadas configuradas. Se crearán al reiniciar la aplicación.</span>
+        }
+        else
+        {
+            <span>No hay tarifas para esta temporada. Se crearán al reiniciar la aplicación.</span>
+        }
+    </div>
+}
+else
+{
+    <style>
+        /* Alineación general: todo centrado */
+        #tabla-tarifas td, #tabla-tarifas th {
+            vertical-align: middle !important; text-align: center !important;
+        }
+        /* Columna Alojamiento (rowspan) — ancho fijo para que no cambie al filtrar */
+        #tabla-tarifas thead th:first-child,
+        .tar-aloj {
+            width: 220px !important; min-width: 220px !important; max-width: 220px !important;
+        }
+        @@media (max-width: 767.98px) {
+            #tabla-tarifas thead th:first-child,
+            .tar-aloj {
+                width: 100px !important; min-width: 100px !important; max-width: 100px !important;
+            }
+        }
+        .tar-aloj {
+            font-weight: 700; border-right: 2px solid #adb5bd;
+            vertical-align: middle !important; word-break: break-word;
+        }
+        /* Excluir .tar-aloj del highlight hover */
+        #tabla-tarifas tbody tr:hover > .tar-aloj {
+            background-color: #343a40 !important;
+        }
+        /* Separación entre grupos */
+        #tabla-tarifas tbody[data-tipo] + tbody[data-tipo] tr:first-child td {
+            border-top: 2px solid #cccccc !important;
+        }
+        /* Columnas de precio: valores a la derecha, encabezados centrados */
+        #tabla-tarifas tbody td.tar-cd,
+        #tabla-tarifas tbody td.tar-sd { text-align: right !important; }
+        #tabla-tarifas thead tr th:nth-child(3),
+        #tabla-tarifas thead tr th:nth-child(4) { text-align: center !important; }
+        /* Desktop */
+        @@media (min-width: 768px) {
+            #tabla-tarifas td, #tabla-tarifas th { padding: .6rem .85rem; font-size: .92rem; }
+            .tar-aloj { font-size: 1.2rem !important; font-weight: bold !important;
+                        line-height: 1 !important; background-color: #343a40 !important; color: #ffffff !important; }
+            .tar-aloj-sub { display: block; margin-top: .35rem; }
+            table th { font-size: 1rem !important; }
+            #tabla-tarifas tbody td.tar-pers,
+            #tabla-tarifas tbody td.tar-cd,
+            #tabla-tarifas tbody td.tar-sd,
+            #tabla-tarifas thead tr th:nth-child(2),
+            #tabla-tarifas thead tr th:nth-child(3),
+            #tabla-tarifas thead tr th:nth-child(4) { border-right: 1px solid #dee2e6 !important; }
+            /* Filas alternadas dentro de cada grupo (excluye la celda Alojamiento) */
+            #tabla-tarifas tbody tr:nth-child(odd)  td:not(.tar-aloj) { background-color: #FFFFFF; }
+            #tabla-tarifas tbody tr:nth-child(even) td:not(.tar-aloj) { background-color: #F5F5F5; }
+        }
+        /* Mobile */
+        @@media (max-width: 767.98px) {
+            #tabla-tarifas td, #tabla-tarifas th { padding: .28rem .35rem; font-size: .76rem; }
+            .tar-aloj { font-size: .76rem !important; font-weight: bold !important;
+                        line-height: 1.4 !important; background-color: #343a40 !important; color: #ffffff !important; }
+            .tar-aloj-sub { display: block; margin-top: .2rem; }
+            #tabla-tarifas tbody tr:hover > .tar-aloj { background-color: #343a40 !important; }
+            table th { font-size: 13px !important; }
+            #tabla-tarifas tbody td.text-end { font-size: 15px !important; }
+            #tabla-tarifas tbody td.tar-pers { font-size: 15px !important; border-right: 1px solid #dee2e6 !important; }
+            #tabla-tarifas tbody td.tar-cd { border-right: 1px solid #dee2e6 !important; }
+            #tabla-tarifas tbody td.tar-sd { border-right: 1px solid #dee2e6 !important; }
+            /* Filas alternadas */
+            #tabla-tarifas tbody tr:nth-child(odd)  td:not(.tar-aloj) { background-color: #FFFFFF; }
+            #tabla-tarifas tbody tr:nth-child(even) td:not(.tar-aloj) { background-color: #F5F5F5; }
+        }
+    </style>
+
+    <div class="card">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0" id="tabla-tarifas">
+                    <thead class="table-dark">
+                        <tr>
+                            <th style="font-size: 13px; font-weight: bold;">Alojamiento</th>
+                            <th style="font-size: 13px; font-weight: bold;"><span class="d-none d-md-inline">Personas</span><span class="d-md-none">Pers.</span></th>
+                            <th style="font-size: 13px; font-weight: bold;"><span class="d-none d-md-inline">Con desayuno</span><span class="d-md-none">C/D</span></th>
+                            <th style="font-size: 13px; font-weight: bold;"><span class="d-none d-md-inline">Sin desayuno</span><span class="d-md-none">S/D</span></th>
+                            <th style="font-size: 13px; font-weight: bold;">Acciones</th>
+                        </tr>
+                    </thead>
+                    @foreach (var g in tablaGrupos.Where(g => g.Activo))
+                    {
+                        <tbody data-tipo="@g.Tipo">
+                            @foreach (var row in g.Rows)
+                            {
+                                <tr>
+                                    @if (row.Idx == 0)
+                                    {
+                                        <td rowspan="@row.Span" class="tar-aloj">
+                                            @if (g.Label.StartsWith("CABAÑA "))
+                                            {
+                                                <text>CABAÑA</text><br /><span class="tar-aloj-sub">@g.Label.Substring(7)</span>
+                                            }
+                                            else
+                                            {
+                                                @g.Label
+                                            }
+                                        </td>
+                                    }
+                                    <td class="tar-pers">@row.Pers</td>
+                                    <td class="text-end text-nowrap tar-cd">
+                                        @if (row.CD > 0) { <text>$@row.CD.ToString("N0")</text> }
+                                        else             { <span class="text-muted">—</span> }
+                                    </td>
+                                    <td class="text-end text-nowrap tar-sd">
+                                        @if (row.SD > 0) { <text>$@row.SD.ToString("N0")</text> }
+                                        else             { <span class="text-muted">—</span> }
+                                    </td>
+                                    <td>
+                                        <button type="button" class="btn btn-outline-primary btn-sm tar-edit-btn"
+                                                title="Editar"
+                                                data-label="@g.Label"
+                                                data-pers="@row.Pers"
+                                                data-filas="@row.FilasJson">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    }
+                </table>
+            </div>
+            <div class="d-md-none text-center text-muted" style="font-size:11px; margin-top:6px !important;">← Deslizá para ver más →</div>
+        </div>
+    </div>
+}

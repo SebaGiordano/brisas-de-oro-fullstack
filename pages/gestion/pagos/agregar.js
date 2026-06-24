@@ -195,14 +195,31 @@ export default function AgregarPago({ user, data, from }) {
       <Head><title>Registrar pago — Reserva #{data.reservaId} — Brisas de Oro</title></Head>
       <Navbar user={user} />
       <style jsx global>{`
-        .detalle-label { font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color: #6c757d; font-weight: 600; margin-bottom: .1rem; }
-        .saldo-deuda    { color: #dc3545; font-weight: 700; }
-        .saldo-cero     { color: #198754; font-weight: 700; }
-        .saldo-negativo { color: #0d6efd; font-weight: 700; }
+        .detalle-label { font-size: .78rem; font-weight: 600; color: #6c757d; text-transform: uppercase; letter-spacing: .04em; }
+        .detalle-valor { font-size: 1rem; }
+        .saldo-cero     { color: #1A5C1A; }
+        .saldo-deuda    { color: #dc3545; font-weight: bold; }
+        .saldo-negativo { color: #198754; font-weight: bold; }
         @media (max-width: 767.98px) {
-          #resumen-row { display: flex; flex-direction: column; }
-          #resumen-row .col-divider { order: 6; }
           .btn-volver-pago { display: flex !important; align-items: center !important; justify-content: center !important; }
+          #resumen-row > div:nth-child(1) { order: 1; flex: 0 0 33.333% !important; max-width: 33.333% !important; }
+          #resumen-row > div:nth-child(2) { order: 2; flex: 0 0 33.333% !important; max-width: 33.333% !important; }
+          #resumen-row > div:nth-child(6) { order: 3; flex: 0 0 33.333% !important; max-width: 33.333% !important; }
+          #resumen-row > div:nth-child(3) { order: 4; flex: 0 0 33.333% !important; max-width: 33.333% !important; margin-top: .75rem !important; }
+          #resumen-row > div:nth-child(4) { order: 5; flex: 0 0 33.333% !important; max-width: 33.333% !important; margin-top: .75rem !important; }
+          #resumen-row > div:nth-child(5) { order: 6; flex: 0 0 33.333% !important; max-width: 33.333% !important; margin-top: .75rem !important; display: flex !important; align-items: center !important; justify-content: center !important; font-weight: 700 !important; }
+          #resumen-row > div:nth-child(7)  { order: 7;  flex: 0 0 100% !important; max-width: 100% !important; }
+          #resumen-row > div:nth-child(8)  { order: 8;  flex: 0 0 100% !important; max-width: 100% !important; display: flex !important; justify-content: space-between !important; align-items: baseline !important; }
+          #resumen-row > div:nth-child(9)  { order: 9;  flex: 0 0 100% !important; max-width: 100% !important; display: flex !important; justify-content: space-between !important; align-items: baseline !important; }
+          #resumen-row > div:nth-child(10) { order: 10; flex: 0 0 100% !important; max-width: 100% !important; display: flex !important; justify-content: space-between !important; align-items: baseline !important; }
+          #resumen-row .detalle-label,
+          #resumen-row .detalle-valor { white-space: nowrap !important; }
+          #resumen-row > div:nth-child(8) .detalle-valor,
+          #resumen-row > div:nth-child(9) .detalle-valor,
+          #resumen-row > div:nth-child(10) .detalle-valor { font-size: 1rem !important; }
+          #resumen-row > div:nth-child(10) .detalle-valor { text-align: right !important; }
+          #botones-pago { justify-content: center !important; }
+          #botones-pago .btn { display: flex !important; align-items: center !important; justify-content: center !important; }
         }
       `}</style>
 
@@ -218,16 +235,25 @@ export default function AgregarPago({ user, data, from }) {
                   <span className="d-md-none">Calendario</span>
                 </Link>
               )}
-              <Link href={`/gestion/reservas/${data.reservaId}`} className="btn btn-outline-secondary btn-sm btn-volver-pago">
+              <Link
+                href={from === 'saldos' ? '/gestion/facturacion?tab=saldos' : `/gestion/reservas/${data.reservaId}`}
+                className="btn btn-outline-secondary btn-sm btn-volver-pago"
+              >
                 <i className="bi bi-arrow-left me-1"></i>
-                <span className="d-none d-md-inline">Volver al detalle de la reserva</span>
-                <span className="d-md-none">Volver al detalle</span>
+                {from === 'saldos' ? (
+                  <>
+                    <span className="d-none d-md-inline">Volver a saldos pendientes</span>
+                    <span className="d-md-none">Saldos pendientes</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="d-none d-md-inline">Volver al detalle de la reserva</span>
+                    <span className="d-md-none">Volver al detalle</span>
+                  </>
+                )}
               </Link>
             </div>
           </div>
-          <p className="text-muted small mt-1 mb-0">
-            Reserva #{data.reservaId} — {data.nombreHuesped}
-          </p>
         </div>
 
         <div id="resumen-errores" className="alert alert-danger d-none" role="alert">
@@ -236,49 +262,63 @@ export default function AgregarPago({ user, data, from }) {
         </div>
 
         {/* Resumen readonly */}
-        <div className="card mb-4">
-          <div className="card-header fw-semibold bg-light">Resumen de la reserva</div>
-          <div className="card-body">
-            <div className="row g-3" id="resumen-row">
-              <div className="col-6 col-md-3">
+        <div className="card mb-4 border-secondary">
+          <div className="card-header fw-semibold bg-light">
+            <i className="bi bi-receipt me-2"></i>Reserva #{data.reservaId} — Resumen
+          </div>
+          <div className="card-body py-2">
+            <div className="row gx-2 gy-1" id="resumen-row">
+              <div className="col-3">
                 <div className="detalle-label">Titular</div>
-                <div className="fw-semibold">{data.nombreHuesped}</div>
+                <div className="detalle-valor fw-semibold">{data.nombreHuesped}</div>
               </div>
-              <div className="col-6 col-md-3">
+              <div className="col-3">
                 <div className="detalle-label">Alojamiento</div>
-                <div>{data.nombreAlojamiento}</div>
+                <div className="detalle-valor">{data.nombreAlojamiento}</div>
               </div>
-              <div className="col-6 col-md-3">
+              <div className="col-2">
                 <div className="detalle-label">Ingreso</div>
-                <div>{data.fechaIngreso}</div>
+                <div className="detalle-valor">{data.fechaIngreso.split('-').reverse().join('/')}</div>
               </div>
-              <div className="col-6 col-md-3">
+              <div className="col-2">
                 <div className="detalle-label">Salida</div>
-                <div>{data.fechaSalida}</div>
+                <div className="detalle-valor">{data.fechaSalida.split('-').reverse().join('/')}</div>
+                <div className="text-muted small d-none d-md-block">
+                  (<strong>{data.noches} noche{data.noches !== 1 ? 's' : ''}</strong>)
+                </div>
               </div>
-              <div className="col-6 col-md-3">
-                <div className="detalle-label">Noches</div>
-                <div>{data.noches}</div>
+              <div className="col-2 d-md-none text-muted small">
+                (<strong>{data.noches} noche{data.noches !== 1 ? 's' : ''}</strong>)
               </div>
-              <div className="col-6 col-md-3">
-                <div className="detalle-label">Tarifa/día</div>
-                <div>{data.tarifaDia != null ? `$${data.tarifaDia.toLocaleString('es-AR')}` : '—'}</div>
+              <div className="col-2">
+                <div className="detalle-label">Tarifa por día</div>
+                <div className="detalle-valor fw-semibold">
+                  {data.tarifaDia != null
+                    ? `$${data.tarifaDia.toLocaleString('es-AR')}`
+                    : <span className="text-muted">—</span>}
+                </div>
               </div>
-              <div className="col-12 col-divider"><hr className="my-1" /></div>
-              <div className="col-6 col-md-3">
+
+              <div className="col-12"><hr className="my-1" /></div>
+
+              <div className="col-4">
                 <div className="detalle-label">Total estadía</div>
-                <div className="fw-semibold">${data.montoTotal.toLocaleString('es-AR')}</div>
+                <div className="detalle-valor fs-5 fw-semibold">${data.montoTotal.toLocaleString('es-AR')}</div>
               </div>
-              <div className="col-6 col-md-3">
-                <div className="detalle-label">Total cobrado</div>
-                <div>${data.totalCobrado.toLocaleString('es-AR')}</div>
+              <div className="col-4">
+                <div className="detalle-label" style={{ color: '#198754', fontWeight: 'bold' }}>Total cobrado</div>
+                <div className="detalle-valor fs-5 text-success fw-semibold">${data.totalCobrado.toLocaleString('es-AR')}</div>
               </div>
-              <div className="col-6 col-md-3">
-                <div className="detalle-label">Saldo pendiente</div>
-                <div className={saldoClase}>
-                  {data.saldoPendiente < 0
-                    ? `−$${Math.abs(data.saldoPendiente).toLocaleString('es-AR')}`
-                    : `$${data.saldoPendiente.toLocaleString('es-AR')}`}
+              <div className="col-4">
+                <div className="detalle-label" style={{ fontSize: '1.1rem', color: '#dc3545', fontWeight: 'bold' }}>Saldo pendiente</div>
+                <div className={`detalle-valor ${saldoClase}`} style={{ fontSize: '1.2rem' }}>
+                  ${data.saldoPendiente.toLocaleString('es-AR')}
+                  {data.saldoPendiente === 0 && (
+                    <i className="bi bi-check-circle-fill fs-5 ms-1 text-success"></i>
+                  )}
+                  {data.saldoPendiente < 0 && (
+                    <span className="d-block small fw-normal mt-1" style={{ color: '#000000' }}>(A devolver al cliente)</span>
+                  )}
                 </div>
               </div>
             </div>
@@ -286,28 +326,38 @@ export default function AgregarPago({ user, data, from }) {
         </div>
 
         {/* Panel Seña */}
-        <div id="panel-sena" className="card mb-3 border-warning" style={{ display: 'none' }}>
-          <div className="card-header bg-warning bg-opacity-10 fw-semibold text-warning-emphasis">Calculadora de seña</div>
-          <div className="card-body">
-            <div className="row g-3 align-items-end">
+        <div id="panel-sena" className="card mb-4" style={{ display: 'none', borderColor: '#90CAF9' }}>
+          <div className="card-body py-3" style={{ backgroundColor: '#E3F2FD' }}>
+            <div className="mb-2">
+              <i className="bi bi-calculator me-1 text-primary"></i>
+              <span className="fw-semibold text-primary small text-uppercase" style={{ letterSpacing: '.04em' }}>
+                Calculadora de seña
+              </span>
+            </div>
+            <div className="row g-2 align-items-center">
               <div className="col-auto">
-                <label htmlFor="pct-sena" className="form-label mb-1">Porcentaje de seña</label>
-                <div className="input-group" style={{ maxWidth: 160 }}>
-                  <input type="number" id="pct-sena" className="form-control" min="1" max="100" defaultValue={40} />
+                <label htmlFor="pct-sena" className="form-label mb-0 small">Porcentaje:</label>
+              </div>
+              <div className="col-auto">
+                <div className="input-group input-group-sm" style={{ width: 120 }}>
+                  <input type="number" id="pct-sena" className="form-control" min="1" max="100" step="1" defaultValue={40} />
                   <span className="input-group-text">%</span>
                 </div>
               </div>
               <div className="col-auto">
-                <div className="detalle-label">Monto sugerido</div>
-                <div className="fs-5 fw-bold" id="monto-sugerido">$0</div>
-                <span id="monto-sugerido-val" data-val="0" style={{ display: 'none' }}></span>
-              </div>
-              <div className="col-auto">
-                <button type="button" className="btn btn-outline-warning btn-sm" id="btn-usar-monto">
-                  Usar este monto
-                </button>
+                <span className="text-muted small">del total de ${data.montoTotal.toLocaleString('es-AR')}</span>
               </div>
             </div>
+            <div className="d-flex align-items-center gap-3 mt-3">
+              <div>
+                <span className="small text-muted">Monto sugerido:</span>
+                <span id="monto-sugerido" className="fs-5 fw-bold text-primary ms-2">$0</span>
+              </div>
+              <button type="button" id="btn-usar-monto" className="btn btn-primary btn-sm">
+                <i className="bi bi-arrow-down-circle me-1"></i>Usar este monto
+              </button>
+            </div>
+            <span id="monto-sugerido-val" data-val="0" style={{ display: 'none' }}></span>
           </div>
         </div>
 
@@ -339,7 +389,7 @@ export default function AgregarPago({ user, data, from }) {
                   <label htmlFor="Fecha" className="form-label">Fecha <span className="text-danger">*</span></label>
                   <input type="date" className="form-control" id="Fecha" />
                 </div>
-                <div className="col-md-5">
+                <div className="col-md-4">
                   <label htmlFor="Monto" className="form-label">Monto <span className="text-danger">*</span></label>
                   <div className="input-group">
                     <span className="input-group-text">$</span>
@@ -350,18 +400,21 @@ export default function AgregarPago({ user, data, from }) {
                     El monto supera el saldo pendiente. Verificá que sea correcto.
                   </div>
                 </div>
-                <div className="col-md-7">
+                <div className="col-md-8">
                   <label htmlFor="Observaciones" className="form-label">Observaciones <span className="text-muted fw-normal small">(opcional)</span></label>
                   <input type="text" className="form-control" id="Observaciones" placeholder="Sin observaciones" />
                 </div>
               </div>
-            </div>
-          </div>
 
-          <div className="mb-5">
-            <button type="submit" className="btn btn-success px-4">
-              <i className="bi bi-cash-coin me-1"></i>Registrar pago
-            </button>
+              <div id="botones-pago" className="d-flex gap-2 mt-4">
+                <button type="submit" className="btn btn-success px-4" id="btn-registrar-pago">
+                  <i className="bi bi-check-lg me-1"></i>Registrar pago
+                </button>
+                <Link href={`/gestion/reservas/${data.reservaId}`} className="btn btn-outline-secondary">
+                  Cancelar
+                </Link>
+              </div>
+            </div>
           </div>
         </form>
 

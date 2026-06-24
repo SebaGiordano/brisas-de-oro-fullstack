@@ -1,0 +1,555 @@
+@model FacturacionViewModel
+@{
+    ViewData["Title"] = "Facturación";
+
+    static string NombreTipoPago(TipoPago t) => t switch
+    {
+        TipoPago.Sena        => "Seña",
+        TipoPago.PagoParcial => "Pago parcial",
+        TipoPago.Cancelacion => "Cancelación",
+        TipoPago.Ajuste      => "Ajuste / Corrección",
+        _                    => t.ToString()
+    };
+
+    static string NombreMetodoPago(MetodoPago m) => m switch
+    {
+        MetodoPago.Transferencia  => "Transferencia",
+        MetodoPago.Efectivo       => "Efectivo",
+        MetodoPago.TarjetaCredito => "Tarjeta crédito",
+        MetodoPago.TarjetaDebito  => "Tarjeta débito",
+        _                         => m.ToString()
+    };
+}
+
+<style>
+    .badge-pago      { display: inline-block; padding: .35em .7em; font-size: .85em; font-weight: 600; border-radius: 4px; }
+    .pago-sin-sena   { background-color: #FFCCCC; color: #7A0000; }
+    .pago-senado     { background-color: #FFF3CC; color: #7A5F00; }
+    .pago-pagado     { background-color: #CCFFCC; color: #1A5C1A; }
+    .pago-invitacion { background-color: #E0E0E0; color: #333333; }
+    @@media (max-width: 767.98px) {
+        /* Scroll horizontal en tablas */
+        .tabla-fact-responsive { overflow-x: auto; overflow-y: auto; max-height: 400px; -webkit-overflow-scrolling: touch; }
+        .tabla-fact-responsive table { min-width: 600px; }
+        .tabla-mov table { min-width: 800px; }
+        .tabla-fact-responsive td,
+        .tabla-fact-responsive th { white-space: nowrap; }
+        /* Botones centrados */
+        .btn { display: inline-flex !important; align-items: center; justify-content: center; }
+        /* Pestañas: se apoyan sobre el borde superior del bloque (sin separador adicional) */
+        #facturacionTabs { display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important; justify-content: center !important; width: 100% !important; margin-bottom: -1px !important; border-bottom: none !important; position: relative !important; z-index: 1 !important; }
+        /* Bloque de contenido: borde completo en los cuatro lados */
+        #facturacionTabsContent { border-top: 1px solid #dee2e6 !important; }
+        /* Pestañas: cada botón ocupa mitad del ancho, texto en una línea */
+        .nav-tabs .nav-link { display: inline-flex !important; align-items: center; gap: 4px; }
+        #facturacionTabs .nav-link { display: flex !important; flex: 1 !important; justify-content: center !important; align-items: center !important; gap: 4px !important; font-size: 14px !important; padding: 10px .75rem !important; white-space: nowrap !important; }
+        /* Botón activo: fondo azul sólido, z-index para cubrir el borde debajo */
+        #facturacionTabs .nav-link.active { background-color: #0d6efd !important; color: #fff !important; border-color: #0d6efd !important; position: relative !important; z-index: 2 !important; }
+        /* Font-size tabla movimientos */
+        .tabla-mov table { font-size: 12px; }
+        /* Encabezado fijo al hacer scroll vertical */
+        .tabla-fact-responsive thead { position: sticky; top: 0; z-index: 4; }
+        .tabla-fact-responsive thead th { background-color: #212529 !important; }
+        /* Columnas fijas en tabla movimientos */
+        .col-fecha-sticky {
+            position: sticky; left: 0; z-index: 2;
+            width: 52px !important; min-width: 52px !important; max-width: 52px !important;
+            white-space: nowrap; padding-right: 4px !important;
+            background-color: #fff !important;
+            border-right: 1px solid #dee2e6 !important;
+        }
+        .col-titular-sticky {
+            position: sticky; left: 52px; z-index: 2;
+            width: 90px !important; min-width: 90px !important; max-width: 90px !important;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+            background-color: #fff !important;
+            border-right: 2px solid #9db5c7 !important;
+            box-shadow: 3px 0 6px -2px rgba(0,0,0,.15);
+        }
+        thead .col-fecha-sticky,
+        thead .col-titular-sticky {
+            z-index: 3;
+            background-color: #212529 !important;
+        }
+        /* Monto total de saldos en negrita */
+        #pane-saldos tfoot td.text-danger { font-weight: 700 !important; }
+        /* Formulario Saldos: fila 1 = Titular, fila 2 = Filtrar + Limpiar al 50% */
+        #pane-saldos form .row { flex-wrap: wrap !important; }
+        #pane-saldos form .row > div:first-child { flex: 0 0 100% !important; width: 100% !important; max-width: 100% !important; }
+        #input-titular-saldos { font-size: 16px !important; }
+        #pane-saldos form .row > div:nth-child(2),
+        #pane-saldos form .row > div:nth-child(3) { flex: 1 !important; }
+        #pane-saldos form .row > div:nth-child(2) .btn,
+        #pane-saldos form .row > div:nth-child(3) .btn { width: 100% !important; display: flex !important; }
+        /* Formulario Movimientos: fila 1 = Titular, fila 2 = Método, fila 3 = Filtrar + Limpiar al 50% */
+        #pane-movimientos form .row > div:first-child { flex: 0 0 100% !important; width: 100% !important; max-width: 100% !important; }
+        #input-titular-mov { font-size: 16px !important; }
+        #pane-movimientos form select[name="metodoPago"] { font-size: 16px !important; }
+        #pane-movimientos form .row > div:nth-child(4) { flex: 0 0 100% !important; width: 100% !important; max-width: 100% !important; order: 2 !important; }
+        #pane-movimientos form .row > div:nth-child(7),
+        #pane-movimientos form .row > div:nth-child(8) { flex: 1 !important; order: 3 !important; }
+        #pane-movimientos form .row > div:nth-child(7) .btn,
+        #pane-movimientos form .row > div:nth-child(8) .btn { width: 100% !important; display: flex !important; }
+        /* Autocompletado: scroll suave en iOS */
+        .ac-dropdown { -webkit-overflow-scrolling: touch !important; }
+        /* Prevenir zoom automático en iOS (ocurre cuando font-size < 16px) */
+        input, select, textarea { font-size: 16px !important; }
+    }
+    @@media (min-width: 769px) {
+        /* Filtros Movimientos: una sola fila, campos proporcionales */
+        #pane-movimientos form .row { flex-wrap: nowrap !important; }
+        #pane-movimientos form .row > div:not(.col-auto) { flex: 1 !important; min-width: 0 !important; }
+    }
+</style>
+
+@* ── Encabezado ── *@
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0">Facturación</h2>
+</div>
+
+@* ── Pestañas ── *@
+<ul class="nav nav-tabs" id="facturacionTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link @(Model.TabActiva == "movimientos" ? "active" : "")"
+                id="btn-tab-movimientos"
+                data-bs-toggle="tab" data-bs-target="#pane-movimientos"
+                type="button" role="tab">
+            <i class="bi bi-arrow-left-right me-1"></i>Movimientos
+            <span class="badge bg-secondary ms-1">@Model.Movimientos.Count</span>
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link @(Model.TabActiva == "saldos" ? "active" : "")"
+                id="btn-tab-saldos"
+                data-bs-toggle="tab" data-bs-target="#pane-saldos"
+                type="button" role="tab">
+            <i class="bi bi-exclamation-circle me-1"></i>Saldos pendientes
+            @if (Model.SaldosPendientes.Any())
+            {
+                <span class="badge bg-danger ms-1">@Model.SaldosPendientes.Count</span>
+            }
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content border border-top-0 rounded-bottom bg-white" id="facturacionTabsContent">
+
+    @* ════════════════════════════════════════════════════════════════════════ *@
+    @* Tab 1 — Movimientos                                                     *@
+    @* ════════════════════════════════════════════════════════════════════════ *@
+    <div class="tab-pane fade @(Model.TabActiva == "movimientos" ? "show active" : "") p-3"
+         id="pane-movimientos" role="tabpanel">
+
+        @* ── Filtros ── *@
+        <form method="get" class="mb-3">
+            <input type="hidden" name="tab" value="movimientos" />
+            <div class="row g-2 align-items-end">
+                <div class="col-12 col-sm-6 col-md-auto">
+                    <label class="form-label small fw-semibold mb-1">Titular</label>
+                    <input type="text" id="input-titular-mov" name="titular" value="@Model.FiltroTitular"
+                           class="form-control form-control-sm" placeholder="Nombre del titular..."
+                           autocomplete="off" />
+                </div>
+                <div class="col-12 col-sm-6 col-md-auto d-mobile-none">
+                    <label class="form-label small fw-semibold mb-1">Desde</label>
+                    <input type="date" name="desde" value="@Model.FiltroDesde"
+                           class="form-control form-control-sm" />
+                </div>
+                <div class="col-12 col-sm-6 col-md-auto d-mobile-none">
+                    <label class="form-label small fw-semibold mb-1">Hasta</label>
+                    <input type="date" name="hasta" value="@Model.FiltroHasta"
+                           class="form-control form-control-sm" />
+                </div>
+                <div class="col-12 col-sm-6 col-md-auto">
+                    <label class="form-label small fw-semibold mb-1">Método de pago</label>
+                    <select name="metodoPago" class="form-select form-select-sm">
+                        <option value="">Todos</option>
+                        @foreach (MetodoPago mp in Enum.GetValues(typeof(MetodoPago)))
+                        {
+                            if (mp.ToString() == Model.FiltroMetodo)
+                            {
+                                <option value="@mp" selected>@NombreMetodoPago(mp)</option>
+                            }
+                            else
+                            {
+                                <option value="@mp">@NombreMetodoPago(mp)</option>
+                            }
+                        }
+                    </select>
+                </div>
+                <div class="col-12 col-sm-6 col-md-auto d-mobile-none">
+                    <label class="form-label small fw-semibold mb-1">Concepto</label>
+                    <select name="concepto" class="form-select form-select-sm">
+                        <option value="">Todos</option>
+                        @foreach (TipoPago tp in Enum.GetValues(typeof(TipoPago)))
+                        {
+                            if (tp.ToString() == Model.FiltroConcepto)
+                            {
+                                <option value="@tp" selected>@NombreTipoPago(tp)</option>
+                            }
+                            else
+                            {
+                                <option value="@tp">@NombreTipoPago(tp)</option>
+                            }
+                        }
+                    </select>
+                </div>
+                <div class="col-12 col-sm-6 col-md-auto d-mobile-none">
+                    <label class="form-label small fw-semibold mb-1">Ordenar por</label>
+                    <select name="orden" class="form-select form-select-sm">
+                        @if (Model.FiltroOrden == "asc")
+                        {
+                            <option value="desc">Más recientes primero</option>
+                            <option value="asc" selected>Más antiguos primero</option>
+                        }
+                        else
+                        {
+                            <option value="desc" selected>Más recientes primero</option>
+                            <option value="asc">Más antiguos primero</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-funnel me-1"></i>Filtrar
+                    </button>
+                </div>
+                <div class="col-auto">
+                    <a asp-action="Index" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-x-lg me-1"></i>Limpiar
+                    </a>
+                </div>
+            </div>
+        </form>
+
+        @* ── Tabla de movimientos ── *@
+        @if (!Model.Movimientos.Any())
+        {
+            <div class="text-center text-muted py-5">
+                <i class="bi bi-inbox fs-2 d-block mb-2 opacity-50"></i>
+                No hay movimientos para los filtros seleccionados.
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive tabla-fact-responsive tabla-mov">
+                <table class="table table-sm table-hover table-bordered align-middle mb-0">
+                    <thead class="table-dark">
+                        <tr>
+                            <th class="text-nowrap col-fecha-sticky">Fecha</th>
+                            <th class="col-titular-sticky">Titular</th>
+                            <th>Alojamiento</th>
+                            <th>Concepto</th>
+                            <th>Método</th>
+                            <th class="text-end">Monto</th>
+                            <th>Observaciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var mov in Model.Movimientos)
+                        {
+                            <tr>
+                                <td class="text-nowrap col-fecha-sticky">
+                                    <span class="d-mobile-none">@mov.Fecha.ToString("dd/MM/yyyy | HH:mm")</span>
+                                    <span class="d-desktop-none">@mov.Fecha.ToString("dd/MM")</span>
+                                </td>
+                                <td class="col-titular-sticky">
+                                    @if (User.IsInRole("Administrador"))
+                                    {
+                                        <a asp-controller="Reservas" asp-action="Details"
+                                           asp-route-id="@mov.ReservaId"
+                                           class="text-decoration-none fw-semibold">
+                                            @mov.NombreHuesped
+                                        </a>
+                                    }
+                                    else
+                                    {
+                                        <span class="fw-semibold text-dark">@mov.NombreHuesped</span>
+                                    }
+                                </td>
+                                <td>@mov.NombreAlojamiento</td>
+                                <td>@NombreTipoPago(mov.TipoPago)</td>
+                                <td>@NombreMetodoPago(mov.MetodoPago)</td>
+                                <td class="text-end fw-bold text-nowrap @(mov.Monto < 0 ? "text-danger" : "text-success")">
+                                    $@mov.Monto.ToString("N0")
+                                </td>
+                                <td class="text-muted small">@(mov.Observaciones ?? "—")</td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tfoot class="table-light fw-bold">
+                        <tr>
+                            <td colspan="5" class="text-end">Total del período:</td>
+                            <td class="text-end fs-6 text-nowrap" style="background-color:#d4edda;color:#155724;font-weight:bold;">
+                                $@Model.TotalPeriodo.ToString("N0")
+                            </td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+            <div class="d-md-none text-center text-muted" style="font-size:11px; margin-top:6px !important;">← Deslizá para ver más →</div>
+            <div class="text-muted small mt-2">
+                @Model.Movimientos.Count movimiento@(Model.Movimientos.Count != 1 ? "s" : "")
+            </div>
+        }
+    </div>
+
+    @* ════════════════════════════════════════════════════════════════════════ *@
+    @* Tab 2 — Saldos pendientes                                               *@
+    @* ════════════════════════════════════════════════════════════════════════ *@
+    <div class="tab-pane fade @(Model.TabActiva == "saldos" ? "show active" : "") p-3"
+         id="pane-saldos" role="tabpanel">
+
+        @* ── Filtro de saldos ── *@
+        <form method="get" class="mb-3">
+            <input type="hidden" name="tab" value="saldos" />
+            <div class="row g-2 align-items-end">
+                <div class="col-auto">
+                    <label class="form-label small fw-semibold mb-1">Titular</label>
+                    <input type="text" id="input-titular-saldos" name="titularSaldos" value="@Model.FiltroTitularSaldos"
+                           class="form-control form-control-sm" placeholder="Nombre del titular..."
+                           autocomplete="off" />
+                </div>
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-funnel me-1"></i>Filtrar
+                    </button>
+                </div>
+                <div class="col-auto">
+                    <a asp-action="Index" asp-route-tab="saldos"
+                       class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-x-lg me-1"></i>Limpiar
+                    </a>
+                </div>
+            </div>
+        </form>
+
+        @if (!Model.SaldosPendientes.Any())
+        {
+            @if (string.IsNullOrEmpty(Model.FiltroTitularSaldos))
+            {
+                <div class="text-center text-success py-5">
+                    <i class="bi bi-check-circle fs-2 d-block mb-2"></i>
+                    <strong>¡Todo al día!</strong> No hay reservas con saldo pendiente.
+                </div>
+            }
+            else
+            {
+                <div class="text-center text-muted py-5">
+                    <i class="bi bi-inbox fs-2 d-block mb-2 opacity-50"></i>
+                    No se encontraron saldos para el titular buscado.
+                </div>
+            }
+        }
+        else
+        {
+            <div class="table-responsive tabla-fact-responsive">
+                <table class="table table-sm table-hover table-bordered align-middle mb-0">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Titular</th>
+                            <th>Alojamiento</th>
+                            <th class="text-center d-mobile-none">Ingreso</th>
+                            <th class="text-center d-mobile-none">Egreso</th>
+                            <th class="text-end d-mobile-none">Total estadía</th>
+                            <th class="text-end d-mobile-none">Cobrado</th>
+                            <th class="text-end">Saldo pendiente</th>
+                            <th class="text-center d-mobile-none">Estado pago</th>
+                            <th class="text-center">Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var s in Model.SaldosPendientes)
+                        {
+                            <tr>
+                                <td class="fw-semibold">@s.NombreHuesped</td>
+                                <td>@s.NombreAlojamiento</td>
+                                <td class="text-center text-nowrap d-mobile-none">
+                                    @s.FechaIngreso.ToString("dd/MM/yyyy")
+                                </td>
+                                <td class="text-center text-nowrap d-mobile-none">
+                                    @s.FechaSalida.ToString("dd/MM/yyyy")
+                                </td>
+                                <td class="text-end text-nowrap d-mobile-none">$@s.MontoTotal.ToString("N0")</td>
+                                <td class="text-end text-success text-nowrap d-mobile-none">
+                                    $@s.TotalCobrado.ToString("N0")
+                                </td>
+                                <td class="text-end fw-bold text-danger text-nowrap">
+                                    $@s.SaldoPendiente.ToString("N0")
+                                </td>
+                                <td class="text-center d-mobile-none">
+                                    <span class="badge-pago @s.EstadoPagoClase">@s.EstadoPagoTexto</span>
+                                </td>
+                                <td class="text-center">
+                                    @if (User.IsInRole("Administrador"))
+                                    {
+                                        <a asp-controller="Pagos" asp-action="AgregarPago"
+                                           asp-route-reservaId="@s.ReservaId"
+                                           class="btn btn-outline-success btn-sm">
+                                            <i class="bi bi-plus-circle me-1"></i>Agregar Pago
+                                        </a>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tfoot class="table-light fw-bold">
+                        <tr>
+                            <td colspan="2" class="text-end d-desktop-none">Total:</td>
+                            <td colspan="2" class="d-mobile-none"></td>
+                            <td colspan="4" class="text-end d-mobile-none">Total saldo pendiente:</td>
+                            <td class="text-end text-nowrap" style="background-color:#f8d7da;color:#721c24;font-weight:bold;">
+                                $@Model.SaldosPendientes.Sum(s => s.SaldoPendiente).ToString("N0")
+                            </td>
+                            <td class="d-mobile-none"></td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+            <div class="d-md-none text-center text-muted" style="font-size:11px; margin-top:6px !important;">← Deslizá para ver más →</div>
+            <div class="text-muted small mt-2">
+                @Model.SaldosPendientes.Count reserva@(Model.SaldosPendientes.Count != 1 ? "s" : "") con saldo pendiente
+            </div>
+        }
+    </div>
+
+</div>
+
+@* ── Modal: sin permisos ── *@
+<div class="modal fade" id="modalSinPermisos" tabindex="-1"
+     aria-labelledby="modalSinPermisosLabel" aria-hidden="true">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title" id="modalSinPermisosLabel">
+                    <i class="bi bi-lock-fill text-warning me-2"></i>Acceso restringido
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body pt-1">
+                <p class="mb-0 text-muted">No tenés permisos para realizar esta acción.</p>
+            </div>
+            <div class="modal-footer border-0 pt-0">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<style>
+    .ac-dropdown {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        z-index: 1050;
+        background: #fff;
+        border: 1px solid #ced4da;
+        border-top: none;
+        border-radius: 0 0 .375rem .375rem;
+        max-height: 280px;
+        overflow-y: auto;
+        display: none;
+        box-shadow: 0 4px 8px rgba(0,0,0,.08);
+    }
+    .ac-dropdown li {
+        padding: .35rem .6rem;
+        font-size: .875rem;
+        cursor: pointer;
+        list-style: none;
+    }
+    .ac-dropdown li:hover,
+    .ac-dropdown li.ac-active {
+        background-color: #e9f0ff;
+        color: #0d47a1;
+    }
+</style>
+<script>
+    function initAutocomplete(inputId) {
+        const input = document.getElementById(inputId);
+        if (!input) return;
+
+        // Wrap input in a positioned container
+        const wrapper = document.createElement('div');
+        wrapper.style.position = 'relative';
+        input.parentNode.insertBefore(wrapper, input);
+        wrapper.appendChild(input);
+
+        const dropdown = document.createElement('ul');
+        dropdown.className = 'ac-dropdown';
+        dropdown.setAttribute('role', 'listbox');
+        wrapper.appendChild(dropdown);
+
+        let debounce;
+
+        input.addEventListener('input', () => {
+            clearTimeout(debounce);
+            const q = input.value.trim();
+            if (q.length < 1) { dropdown.style.display = 'none'; return; }
+
+            debounce = setTimeout(async () => {
+                try {
+                    const res = await fetch(`/Facturacion/BuscarTitulares?q=${encodeURIComponent(q)}`);
+                    const items = await res.json();
+                    renderDropdown(items);
+                } catch { dropdown.style.display = 'none'; }
+            }, 220);
+        });
+
+        function renderDropdown(items) {
+            dropdown.innerHTML = '';
+            if (!items.length) { dropdown.style.display = 'none'; return; }
+            items.forEach(nombre => {
+                const li = document.createElement('li');
+                li.setAttribute('role', 'option');
+                li.textContent = nombre;
+                li.addEventListener('pointerdown', e => {
+                    e.preventDefault();
+                    input.value = nombre;
+                    dropdown.style.display = 'none';
+                });
+                dropdown.appendChild(li);
+            });
+            dropdown.style.display = 'block';
+        }
+
+        // Teclado: flechas + Enter + Esc
+        input.addEventListener('keydown', e => {
+            const items = [...dropdown.querySelectorAll('li')];
+            const activeIdx = items.findIndex(li => li.classList.contains('ac-active'));
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                const next = activeIdx < items.length - 1 ? activeIdx + 1 : 0;
+                items.forEach(li => li.classList.remove('ac-active'));
+                items[next]?.classList.add('ac-active');
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                const prev = activeIdx > 0 ? activeIdx - 1 : items.length - 1;
+                items.forEach(li => li.classList.remove('ac-active'));
+                items[prev]?.classList.add('ac-active');
+            } else if (e.key === 'Enter') {
+                const active = dropdown.querySelector('li.ac-active');
+                if (active && dropdown.style.display !== 'none') {
+                    e.preventDefault();
+                    input.value = active.textContent;
+                    dropdown.style.display = 'none';
+                }
+            } else if (e.key === 'Escape') {
+                dropdown.style.display = 'none';
+            }
+        });
+
+        // Cierra al hacer clic fuera
+        document.addEventListener('click', e => {
+            if (!wrapper.contains(e.target)) dropdown.style.display = 'none';
+        });
+    }
+
+    initAutocomplete('input-titular-mov');
+    initAutocomplete('input-titular-saldos');
+</script>
+}

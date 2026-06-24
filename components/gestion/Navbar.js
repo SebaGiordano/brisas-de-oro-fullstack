@@ -87,6 +87,10 @@ export default function Navbar() {
       </header>
 
       <style jsx global>{`
+        body {
+          font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
+            "Noto Sans", "Liberation Sans", Arial, sans-serif !important;
+        }
         .navbar-nav { align-items: center; }
         .btn-salir:hover, .btn-salir:active, .btn-salir:focus {
           background-color: #dc3545 !important;
@@ -98,7 +102,7 @@ export default function Navbar() {
           color: #fff !important;
           border-radius: 6px;
           font-weight: 600;
-          padding: .25rem .75rem;
+          padding: .35rem 1rem;
           line-height: 1.5;
         }
         .navbar { overflow: hidden; min-height: unset; }
