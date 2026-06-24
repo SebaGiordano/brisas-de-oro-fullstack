@@ -97,14 +97,6 @@ export default function Navbar() {
           border-color: #dc3545 !important;
           color: #fff !important;
         }
-        .navbar-nav .nav-link.active {
-          background-color: #0d6efd;
-          color: #fff !important;
-          border-radius: 6px;
-          font-weight: 600;
-          padding: .35rem 1rem;
-          line-height: 1.5;
-        }
         .navbar { overflow: hidden; min-height: unset; }
         .navbar .navbar-brand, .navbar .nav-link, .navbar .navbar-toggler { padding-top: 0; padding-bottom: 0; }
         body { padding-top: 90px; }

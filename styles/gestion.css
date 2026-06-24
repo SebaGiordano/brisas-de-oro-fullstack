@@ -17,6 +17,16 @@
   transition: none !important;
 }
 
+header .navbar .navbar-nav .nav-link.active {
+  background-color: #0d6efd !important;
+  color: #fff !important;
+  border-radius: 6px !important;
+  font-weight: 600 !important;
+  padding: .35rem 1rem !important;
+  line-height: 1.5 !important;
+  display: inline-block !important;
+}
+
 html {
   font-size: 14px;
 }

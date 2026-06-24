@@ -365,11 +365,16 @@ export default function TarifasIndex({ user, data, mensaje, mensajeTipo }) {
             font-weight: 700; border-right: 2px solid #adb5bd;
             vertical-align: middle !important; word-break: break-word;
         }
-        #tabla-tarifas tbody tr:hover > .tar-aloj {
-            background-color: #343a40 !important;
-        }
         #tabla-tarifas tbody[data-tipo] + tbody[data-tipo] tr:first-child td {
-            border-top: 2px solid #cccccc !important;
+            border-top: 3px solid #6c757d !important;
+        }
+        #tabla-tarifas tbody tr:hover td.tar-aloj,
+        #tabla-tarifas tbody tr:hover > td.tar-aloj,
+        #tabla-tarifas.table-hover > tbody > tr:hover > td.tar-aloj {
+            background-color: #EDEDED !important;
+            color: #212529 !important;
+            --bs-table-bg-state: #EDEDED !important;
+            --bs-table-accent-bg: transparent !important;
         }
         #tabla-tarifas thead + tbody[data-tipo] tr:first-child td {
             border-top: 2px solid #ffffff !important;
@@ -381,7 +386,8 @@ export default function TarifasIndex({ user, data, mensaje, mensajeTipo }) {
         @media (min-width: 768px) {
             #tabla-tarifas td, #tabla-tarifas th { padding: .6rem .85rem; font-size: .92rem; }
             .tar-aloj { font-size: 1.2rem !important; font-weight: bold !important;
-                        line-height: 1 !important; background-color: #343a40 !important; color: #ffffff !important; }
+                        line-height: 1 !important; background-color: #EDEDED !important; color: #212529 !important;
+                        font-family: Georgia, 'Times New Roman', serif !important; letter-spacing: 0.5px !important; }
             .tar-aloj-sub { display: block; margin-top: .35rem; }
             table th { font-size: 1rem !important; }
             #tabla-tarifas tbody td.tar-pers,
@@ -396,9 +402,10 @@ export default function TarifasIndex({ user, data, mensaje, mensajeTipo }) {
         @media (max-width: 767.98px) {
             #tabla-tarifas td, #tabla-tarifas th { padding: .28rem .35rem; font-size: .76rem; }
             .tar-aloj { font-size: .76rem !important; font-weight: bold !important;
-                        line-height: 1.4 !important; background-color: #343a40 !important; color: #ffffff !important; }
+                        line-height: 1.4 !important; background-color: #EDEDED !important; color: #212529 !important;
+                        font-family: Georgia, 'Times New Roman', serif !important; letter-spacing: 0.5px !important; }
             .tar-aloj-sub { display: block; margin-top: .2rem; }
-            #tabla-tarifas tbody tr:hover > .tar-aloj { background-color: #343a40 !important; }
+            #tabla-tarifas tbody tr:hover > .tar-aloj { background-color: #EDEDED !important; }
             table th { font-size: 13px !important; }
             #tabla-tarifas tbody td.text-end { font-size: 15px !important; }
             #tabla-tarifas tbody td.tar-pers { font-size: 15px !important; border-right: 1px solid #dee2e6 !important; }
