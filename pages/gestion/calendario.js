@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/pages/api/auth/[...nextauth]'
 import Navbar from '@/components/gestion/Navbar'
+import Footer from '@/components/gestion/Footer'
 
 const EMPTY_DATA = { reservas: [], alojamientos: [], apartMap: [], esAdmin: false }
 
@@ -700,6 +701,7 @@ export default function CalendarioPage({ user, data }) {
           #cal-topbar > div { grid-column: 2 !important; }
         }
       `}</style>
+      <Footer />
     </>
   )
 }

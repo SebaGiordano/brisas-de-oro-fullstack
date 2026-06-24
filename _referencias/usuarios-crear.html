@@ -1,0 +1,180 @@
+@model CrearUsuarioViewModel
+@{
+    ViewData["Title"] = "Nuevo usuario";
+}
+
+<style>
+    @@media (max-width: 767.98px) {
+        #btn-volver-crear-usr   { display: flex !important; align-items: center !important; justify-content: center !important; }
+        #btn-cancelar-crear-usr { display: flex !important; align-items: center !important; justify-content: center !important; }
+        #btns-crear-usr         { justify-content: center !important; }
+        /* Modal confirmación: altura auto, padding-bottom igual al lateral */
+        #modal-confirmar-crear .modal-content { height: auto !important; min-height: unset !important; }
+        #modal-confirmar-crear .modal-footer  { padding-bottom: 1rem !important; }
+    }
+    @@media (min-width: 769px) {
+        #btns-crear-usr { justify-content: center !important; }
+    }
+</style>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0">Nuevo usuario</h2>
+    <a id="btn-volver-crear-usr" asp-action="Index" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-1"></i>Volver al listado
+    </a>
+</div>
+
+<div class="card" style="max-width: 540px;">
+    <div class="card-body">
+
+        @if (!ViewData.ModelState.IsValid)
+        {
+            <div class="alert alert-danger">
+                <strong>Corregí los siguientes errores:</strong>
+                <ul class="mb-0 mt-1">
+                    @foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+                    {
+                        <li>@error.ErrorMessage</li>
+                    }
+                </ul>
+            </div>
+        }
+
+        <form id="form-crear-usr" asp-action="Crear" method="post" novalidate>
+            @Html.AntiForgeryToken()
+
+            <div class="mb-3">
+                <label asp-for="UserName" class="form-label">
+                    Nombre de usuario <span class="text-danger">*</span>
+                </label>
+                <input asp-for="UserName" class="form-control" placeholder="ej: maria.gonzalez" />
+                <span asp-validation-for="UserName" class="text-danger small"></span>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="Password" class="form-label">
+                    Contraseña <span class="text-danger">*</span>
+                </label>
+                <input asp-for="Password" type="password" class="form-control" />
+                <span asp-validation-for="Password" class="text-danger small"></span>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="ConfirmPassword" class="form-label">
+                    Confirmar contraseña <span class="text-danger">*</span>
+                </label>
+                <input asp-for="ConfirmPassword" type="password" class="form-control" />
+                <span asp-validation-for="ConfirmPassword" class="text-danger small"></span>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="PhoneNumber" class="form-label">Número de celular</label>
+                <input asp-for="PhoneNumber" class="form-control" placeholder="ej: 11 1234-5678" />
+                <span asp-validation-for="PhoneNumber" class="text-danger small"></span>
+            </div>
+
+            <div class="mb-4">
+                <label asp-for="Rol" class="form-label">
+                    Rol <span class="text-danger">*</span>
+                </label>
+                <select asp-for="Rol" class="form-select">
+                    @if (Model.Rol == "Administrador")
+                    {
+                        <option value="Administrador" selected>Administrador</option>
+                        <option value="Viewer">Viewer</option>
+                    }
+                    else
+                    {
+                        <option value="Administrador">Administrador</option>
+                        <option value="Viewer" selected>Viewer</option>
+                    }
+                </select>
+                <div class="form-text text-muted">
+                    <strong>Administrador:</strong> acceso completo.
+                    <strong>Viewer:</strong> solo lectura.
+                </div>
+                <span asp-validation-for="Rol" class="text-danger small"></span>
+            </div>
+
+            <div id="btns-crear-usr" class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary px-4">
+                    <i class="bi bi-check-lg me-1"></i>Crear usuario
+                </button>
+                <a id="btn-cancelar-crear-usr" asp-action="Index" class="btn btn-outline-secondary">Cancelar</a>
+            </div>
+        </form>
+
+    </div>
+</div>
+
+@* ── Modal de confirmación ── *@
+<div class="modal fade" id="modal-confirmar-crear" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:400px;">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <h6 class="modal-title fw-semibold">Confirmar nuevo usuario</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body pb-2">
+                <table class="table table-sm table-borderless mb-0" style="font-size:.9rem;">
+                    <tr>
+                        <td class="text-muted pe-3" style="white-space:nowrap;">Nombre de usuario</td>
+                        <td class="fw-semibold" id="conf-username"></td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted pe-3">Rol</td>
+                        <td class="fw-semibold" id="conf-rol"></td>
+                    </tr>
+                    <tr id="conf-celular-row">
+                        <td class="text-muted pe-3">Celular</td>
+                        <td class="fw-semibold" id="conf-celular"></td>
+                    </tr>
+                </table>
+            </div>
+            <div class="modal-footer py-2 gap-2">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">
+                    Volver y corregir
+                </button>
+                <button type="button" class="btn btn-success btn-sm" id="btn-confirmar-crear">
+                    <i class="bi bi-check-lg me-1"></i>Sí, crear usuario
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{ await Html.RenderPartialAsync("_ValidationScriptsPartial"); }
+
+    <script>
+    let _confirmadoCrear = false;
+
+    document.getElementById('form-crear-usr').addEventListener('submit', function (e) {
+        if (_confirmadoCrear) return;
+        e.preventDefault();
+
+        // Poblar modal con valores actuales
+        document.getElementById('conf-username').textContent =
+            document.getElementById('UserName').value.trim() || '—';
+        document.getElementById('conf-rol').textContent =
+            document.getElementById('Rol').value || '—';
+
+        const celular = document.getElementById('PhoneNumber').value.trim();
+        const fila = document.getElementById('conf-celular-row');
+        if (celular) {
+            document.getElementById('conf-celular').textContent = celular;
+            fila.style.display = '';
+        } else {
+            fila.style.display = 'none';
+        }
+
+        new bootstrap.Modal(document.getElementById('modal-confirmar-crear')).show();
+    });
+
+    document.getElementById('btn-confirmar-crear').addEventListener('click', function () {
+        _confirmadoCrear = true;
+        bootstrap.Modal.getInstance(document.getElementById('modal-confirmar-crear')).hide();
+        document.getElementById('form-crear-usr').requestSubmit();
+    });
+    </script>
+}

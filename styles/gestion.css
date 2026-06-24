@@ -17,6 +17,11 @@
   transition: none !important;
 }
 
+header .navbar .navbar-nav .nav-link {
+  padding-left: .6rem !important;
+  padding-right: .6rem !important;
+}
+
 header .navbar .navbar-nav .nav-link.active {
   background-color: #0d6efd !important;
   color: #fff !important;
@@ -25,6 +30,45 @@ header .navbar .navbar-nav .nav-link.active {
   padding: .35rem 1rem !important;
   line-height: 1.5 !important;
   display: inline-block !important;
+}
+
+header .navbar .navbar-nav .nav-link-stable {
+  display: inline-grid;
+  grid-template-columns: 1fr;
+}
+
+header .navbar .navbar-nav .nav-link-stable > .nav-link-text,
+header .navbar .navbar-nav .nav-link-stable > .nav-link-ghost {
+  grid-row: 1;
+  grid-column: 1;
+}
+
+header .navbar .navbar-nav .nav-link-stable > .nav-link-ghost {
+  font-weight: 700;
+  visibility: hidden;
+  pointer-events: none;
+  user-select: none;
+}
+
+header .navbar .navbar-nav .nav-link-stable:not(.active):hover > .nav-link-text {
+  font-weight: 700;
+}
+
+header .navbar .navbar-nav .nav-link-stable.active > .nav-link-ghost {
+  display: none;
+}
+
+footer {
+  background-color: transparent !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  font-size: 0.95rem;
+}
+
+footer .container {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 html {

@@ -5,6 +5,7 @@ import { useRouter } from 'next/router'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/pages/api/auth/[...nextauth]'
 import Navbar from '@/components/gestion/Navbar'
+import Footer from '@/components/gestion/Footer'
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
                'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
@@ -876,6 +877,7 @@ export default function Dashboard({ user, data }) {
           </div>
         ))}
       </div>
+      <Footer />
     </>
   )
 }

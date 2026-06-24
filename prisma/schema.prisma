@@ -119,6 +119,7 @@ model Usuario {
   rol           Int      @default(1) // 0=Administrador 1=Viewer
   activo        Boolean  @default(true)
   fechaCreacion DateTime @default(now())
+  phoneNumber   String?
 }
 
 // ─── Tablas de ASP.NET Identity (solo referencia, no usar desde Next.js) ─────

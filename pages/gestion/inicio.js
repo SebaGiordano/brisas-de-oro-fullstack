@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/pages/api/auth/[...nextauth]'
 import Navbar from '@/components/gestion/Navbar'
+import Footer from '@/components/gestion/Footer'
 
 export async function getServerSideProps(context) {
   const { req, res } = context
@@ -454,6 +455,7 @@ export default function GestionInicio({ data }) {
             .tabla-pendientes tbody td:last-child  { padding-right: 1rem !important; }
         }
       `}</style>
+      <Footer />
     </>
   )
 }

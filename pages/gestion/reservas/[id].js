@@ -4,6 +4,7 @@ import { useRouter } from 'next/router'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/pages/api/auth/[...nextauth]'
 import Navbar from '@/components/gestion/Navbar'
+import Footer from '@/components/gestion/Footer'
 
 export async function getServerSideProps(context) {
   const { req, res, query, params } = context
@@ -437,6 +438,7 @@ export default function ReservaDetalle({ user, data, from, mensaje, mensajeTipo 
           </div>
         )}
       </div>
+      <Footer />
     </>
   )
 }

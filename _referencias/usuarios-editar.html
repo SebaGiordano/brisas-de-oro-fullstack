@@ -1,0 +1,83 @@
+@model EditarUsuarioViewModel
+@{
+    ViewData["Title"] = $"Editar usuario — {Model.UserName}";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0">Editar usuario</h2>
+    <a asp-action="Index" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-1"></i>Volver al listado
+    </a>
+</div>
+
+<div class="card" style="max-width: 540px;">
+    <div class="card-body">
+
+        @if (!ViewData.ModelState.IsValid)
+        {
+            <div class="alert alert-danger">
+                <strong>Corregí los siguientes errores:</strong>
+                <ul class="mb-0 mt-1">
+                    @foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+                    {
+                        <li>@error.ErrorMessage</li>
+                    }
+                </ul>
+            </div>
+        }
+
+        <form asp-action="Editar" method="post" novalidate>
+            @Html.AntiForgeryToken()
+            <input type="hidden" asp-for="Id" />
+            <input type="hidden" asp-for="UserName" />
+
+            <div class="mb-3">
+                <label class="form-label">Nombre de usuario</label>
+                <input type="text" class="form-control" value="@Model.UserName"
+                       disabled style="background-color: #f8f9fa;" />
+                <div class="form-text text-muted">El nombre de usuario no se puede modificar.</div>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="PhoneNumber" class="form-label">Número de celular</label>
+                <input asp-for="PhoneNumber" class="form-control" placeholder="ej: 11 1234-5678" />
+                <span asp-validation-for="PhoneNumber" class="text-danger small"></span>
+            </div>
+
+            <div class="mb-4">
+                <label asp-for="Rol" class="form-label">
+                    Rol <span class="text-danger">*</span>
+                </label>
+                <select asp-for="Rol" class="form-select">
+                    @if (Model.Rol == "Administrador")
+                    {
+                        <option value="Administrador" selected>Administrador</option>
+                        <option value="Viewer">Viewer</option>
+                    }
+                    else
+                    {
+                        <option value="Administrador">Administrador</option>
+                        <option value="Viewer" selected>Viewer</option>
+                    }
+                </select>
+                <div class="form-text text-muted">
+                    <strong>Administrador:</strong> acceso completo.
+                    <strong>Viewer:</strong> solo lectura.
+                </div>
+                <span asp-validation-for="Rol" class="text-danger small"></span>
+            </div>
+
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary px-4">
+                    <i class="bi bi-check-lg me-1"></i>Guardar cambios
+                </button>
+                <a asp-action="Index" class="btn btn-outline-secondary">Cancelar</a>
+            </div>
+        </form>
+
+    </div>
+</div>
+
+@section Scripts {
+    @{ await Html.RenderPartialAsync("_ValidationScriptsPartial"); }
+}

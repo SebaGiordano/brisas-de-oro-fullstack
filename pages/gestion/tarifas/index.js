@@ -5,6 +5,7 @@ import { useEffect } from 'react'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/pages/api/auth/[...nextauth]'
 import Navbar from '@/components/gestion/Navbar'
+import Footer from '@/components/gestion/Footer'
 
 export async function getServerSideProps(context) {
   const { req, res, query } = context
@@ -675,6 +676,7 @@ export default function TarifasIndex({ user, data, mensaje, mensajeTipo }) {
           </div>
         )}
       </div>
+      <Footer />
     </>
   )
 }

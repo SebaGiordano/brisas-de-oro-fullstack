@@ -1,0 +1,145 @@
+@model List<UsuarioListItemViewModel>
+@{
+    ViewData["Title"] = "Usuarios";
+}
+
+<style>
+    @@media (max-width: 767.98px) {
+        .tabla-usr-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .tabla-usr-responsive table { min-width: 520px; }
+        .tabla-usr-responsive td,
+        .tabla-usr-responsive th { white-space: nowrap; padding: 0.5rem 0.6rem; text-align: center; vertical-align: middle; }
+        .tabla-usr-responsive td:first-child,
+        .tabla-usr-responsive th:first-child { text-align: left; }
+        /* Centrado flex dentro de celdas de badges y botones */
+        .tabla-usr-responsive td.text-center {
+            display: table-cell;
+            vertical-align: middle;
+        }
+        /* Encabezado fijo */
+        .tabla-usr-responsive thead { position: sticky; top: 0; z-index: 4; }
+        .tabla-usr-responsive thead th { background-color: #212529 !important; }
+        /* Columna Usuario sticky */
+        .col-usuario-sticky {
+            position: sticky; left: 0; z-index: 2;
+            background-color: #fff !important;
+            box-shadow: 3px 0 6px -2px rgba(0,0,0,.15);
+        }
+        thead .col-usuario-sticky { z-index: 5; background-color: #212529 !important; }
+        /* Botones, badges e íconos centrados */
+        .btn { display: inline-flex !important; align-items: center; justify-content: center; }
+        .badge { display: inline-flex !important; align-items: center; justify-content: center; }
+        .tabla-usr-responsive td.text-center { vertical-align: middle; }
+    }
+</style>
+
+@* ── Encabezado ── *@
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0">Usuarios</h2>
+    <a asp-action="Crear" class="btn btn-primary">
+        <i class="bi bi-person-plus me-1"></i>Nuevo usuario
+    </a>
+</div>
+
+@* ── Mensajes TempData ── *@
+@if (TempData["Mensaje"] != null)
+{
+    var tipo = TempData["MensajeTipo"]?.ToString() ?? "success";
+    <div class="alert alert-@tipo alert-dismissible fade show" role="alert">
+        <i class="bi bi-@(tipo == "success" ? "check-circle" : tipo == "warning" ? "exclamation-triangle" : "info-circle") me-2"></i>
+        @TempData["Mensaje"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+@* ── Tabla ── *@
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive tabla-usr-responsive">
+            <table class="table table-sm table-hover align-middle mb-0">
+                <thead class="table-dark">
+                    <tr>
+                        <th class="col-usuario-sticky">Usuario</th>
+                        <th class="text-center">Rol</th>
+                        <th>Celular</th>
+                        <th class="text-center">Alta</th>
+                        <th class="text-center">Estado</th>
+                        <th class="text-center">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var u in Model)
+                    {
+                        <tr class="@(!u.Activo ? "table-secondary text-muted" : "")">
+                            <td class="col-usuario-sticky">
+                                <span class="fw-semibold">@u.UserName</span>
+                                @if (u.EsUsuarioActual)
+                                {
+                                    <span class="badge bg-secondary ms-1 small">vos</span>
+                                }
+                            </td>
+                            <td class="text-center">
+                                @if (u.Rol == "Administrador")
+                                {
+                                    <span class="badge bg-danger">Administrador</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary">@u.Rol</span>
+                                }
+                            </td>
+                            <td>@(u.PhoneNumber ?? "—")</td>
+                            <td class="text-center text-nowrap text-muted small">
+                                @(u.FechaCreacion == DateTime.MinValue ? "—" : u.FechaCreacion.ToString("dd/MM/yyyy"))
+                            </td>
+                            <td class="text-center">
+                                @if (u.Activo)
+                                {
+                                    <span class="badge bg-success">Activo</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-danger">Inactivo</span>
+                                }
+                            </td>
+                            <td class="text-center text-nowrap">
+                                <a asp-action="Editar" asp-route-id="@u.Id"
+                                   class="btn btn-outline-primary btn-sm" title="Editar">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                @if (!u.EsUsuarioActual)
+                                {
+                                    @if (u.Activo)
+                                    {
+                                        <form asp-action="Desactivar" asp-route-id="@u.Id"
+                                              method="post" class="d-inline"
+                                              onsubmit="return confirm('¿Desactivar al usuario @Html.Raw(u.UserName.Replace("'", "\\'"))? No podrá iniciar sesión hasta que sea reactivado.')">
+                                            @Html.AntiForgeryToken()
+                                            <button type="submit" class="btn btn-outline-danger btn-sm" title="Desactivar">
+                                                <i class="bi bi-person-x"></i>
+                                            </button>
+                                        </form>
+                                    }
+                                    else
+                                    {
+                                        <form asp-action="Activar" asp-route-id="@u.Id"
+                                              method="post" class="d-inline">
+                                            @Html.AntiForgeryToken()
+                                            <button type="submit" class="btn btn-outline-success btn-sm" title="Activar">
+                                                <i class="bi bi-person-check"></i>
+                                            </button>
+                                        </form>
+                                    }
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <div class="d-md-none text-center text-muted" style="font-size:11px; margin-top:6px !important;">← Deslizá para ver más →</div>
+    </div>
+</div>
+<div class="text-muted small mt-2">
+    @Model.Count usuario@(Model.Count != 1 ? "s" : "") registrado@(Model.Count != 1 ? "s" : "")
+</div>
