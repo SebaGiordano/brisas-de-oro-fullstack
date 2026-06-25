@@ -123,26 +123,25 @@ export default function Navbar() {
           footer .container { white-space: normal !important; word-wrap: break-word !important; text-align: center !important; }
           body > .container { padding-top: 12px !important; }
         }
-        @media (max-width: 1300px) and (min-width: 1200px) {
-          .navbar-expand-xl .navbar-collapse {
+        @media (min-width: 1200px) and (max-width: 1249.98px) {
+          .navbar-expand-xl > .container-fluid {
+            flex-wrap: wrap !important;
+          }
+          .navbar-expand-xl .navbar-collapse:not(.show) {
             display: none !important;
+            flex-basis: 100% !important;
           }
           .navbar-expand-xl .navbar-toggler {
             display: block !important;
           }
           .navbar-expand-xl .navbar-collapse.show {
+            flex-basis: 100% !important;
+            width: 100% !important;
             display: flex !important;
             flex-direction: column !important;
-            flex-basis: 100% !important;
-            align-items: stretch !important;
-            background: #fff;
-            border-radius: 0 0 12px 12px;
-            box-shadow: 0 6px 20px rgba(0,0,0,.1);
-            padding: 8px 12px 14px;
-            width: 100% !important;
           }
         }
-        @media (max-width: 1299.98px) {
+        @media (max-width: 1249.98px) {
           .navbar { overflow: visible !important; }
           .navbar-collapse.show {
             display: flex !important;
